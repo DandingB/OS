@@ -38,6 +38,10 @@ HBA_MEM* init_ahci()
 			}
 		}
 	}
+	else
+	{
+		print("No AHCI found!", 1);
+	}
 
 	return hba;
 }
@@ -120,7 +124,7 @@ void write(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 	HBA_CMD_HEADER* cmdheader = (HBA_CMD_HEADER*)(port->clb);
 	cmdheader->cfl = sizeof(FIS_REG_H2D) / sizeof(uint32_t);	// Command FIS size in dwords
 	cmdheader->prdtl = 1;	// PRDT entries count
-	cmdheader->w = 1;
+	cmdheader->w = 1;		//Write 
 	cmdheader->c = 1;
 
 	// Set up command table entry
