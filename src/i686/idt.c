@@ -2,6 +2,7 @@
 #include "idt.h"
 #include "x86.h"
 #include "pic.h"
+#include "apic.h"
 
 void key_press(uint8_t key);
 
@@ -11,6 +12,11 @@ static idt_entry_t idt[256]; // Create an array of IDT entries; aligned for perf
 static idtr_t idtr;
 
 extern void* isr_stub_table[];
+
+
+
+
+int sd = 0;
 
 void interrupt_handler(uint32_t interrupt, uint32_t error)
 {
@@ -36,12 +42,14 @@ void interrupt_handler(uint32_t interrupt, uint32_t error)
 		//else {
 		//	outb(PIC_2_CTRL, PIC_CMD_END_OF_INTERRUPT);
 		//}
-
+		print_hexdump(&sd, 1, 1);
+		sd++;
+		apic_send_eoi();
 	}
 	else
 	{
-		print("Exception!", 2);
-		print_hexdump(&interrupt, 1, 7);
+		print("Exception!", 1);
+		print_hexdump(&interrupt, 1, 2);
 		__asm__ volatile ("cli; hlt"); // Completely hangs the computer
 	}
 }
@@ -71,4 +79,3 @@ void init_idt()
 	__asm__ volatile ("lidt %0" : : "m"(idtr)); // load the new IDT
 	__asm__ volatile ("sti"); // set the interrupt flag
 }
-

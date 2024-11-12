@@ -13,11 +13,9 @@ __attribute__((aligned(PAGE_SIZE)))
 page_directory_entry_t page_directory[PAGE_ENTRIES];
 
 __attribute__((aligned(PAGE_SIZE)))
-page_table_entry_t first_page_table[PAGE_ENTRIES];
-__attribute__((aligned(PAGE_SIZE)))
-page_table_entry_t second_page_table[PAGE_ENTRIES];
+page_table_entry_t page_table[PAGE_ENTRIES * 4];
 
-void initialize_page_table(page_table_entry_t* page_table, uint32_t vaddr_start )
+void initialize_page_table(page_table_entry_t* page_table, uint32_t vaddr_start)
 {
     for (int i = 0; i < PAGE_ENTRIES; i++) 
     {
@@ -27,14 +25,15 @@ void initialize_page_table(page_table_entry_t* page_table, uint32_t vaddr_start 
 
 void initialize_page_directory(page_directory_entry_t* page_directory)
 {
-    page_directory[0] = ((uint32_t)first_page_table) | 0x3; // Present (1) | Read/Write (1)
-    page_directory[1] = ((uint32_t)second_page_table) | 0x3; // Present (1) | Read/Write (1)
-    
     // Clear other entries for simplicity (optional)
-    for (int i = 2; i < PAGE_ENTRIES; i++)
-    {
+    for (int i = 0; i < PAGE_ENTRIES; i++)
         page_directory[i] = 0;
-    }
+
+    page_directory[0] = ((uint32_t)&page_table[0*PAGE_ENTRIES]) | 0x3; // Present (1) | Read/Write (1)
+    page_directory[1] = ((uint32_t)&page_table[1*PAGE_ENTRIES]) | 0x3; // Present (1) | Read/Write (1)
+    page_directory[1018] = ((uint32_t)&page_table[2*PAGE_ENTRIES]) | 0x3; // Present (1) | Read/Write (1)
+    page_directory[1019] = ((uint32_t)&page_table[3*PAGE_ENTRIES]) | 0x3; // Present (1) | Read/Write (1)
+
 }
 
 void enable_paging(uint32_t* page_directory) 
@@ -51,8 +50,10 @@ void enable_paging(uint32_t* page_directory)
 
 void init_paging() 
 {
-    initialize_page_table(first_page_table, 0);
-    initialize_page_table(second_page_table, 4096 + PAGE_SIZE * PAGE_ENTRIES);
+    initialize_page_table(&page_table[0*PAGE_ENTRIES], 0 * PAGE_SIZE * PAGE_ENTRIES);
+    initialize_page_table(&page_table[1*PAGE_ENTRIES], 1 * PAGE_SIZE * PAGE_ENTRIES);
+    initialize_page_table(&page_table[2*PAGE_ENTRIES], 1018 * PAGE_SIZE * PAGE_ENTRIES); // AHCI base
+    initialize_page_table(&page_table[3*PAGE_ENTRIES], 1019 * PAGE_SIZE * PAGE_ENTRIES); // APIC base
     initialize_page_directory(page_directory);
     enable_paging(page_directory);
 }

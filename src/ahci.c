@@ -19,12 +19,21 @@ HBA_MEM* init_ahci()
 		if (class == 0x01 && subclass == 0x06) // We found a PCI device which is a Mass storage and AHCI controller
 		{
 			uint32_t ahci_base = pci_read_config_dword(0, device, 0, 0x24); // Get the ABAR (BAR5)
+			// uint8_t cap = pci_read_config_dword(0, device, 0, 0x34) & 0x000000FF;
+			// uint32_t cap1 = pci_read_config_dword(0, device, 0, cap);
+			// uint32_t cap12 = pci_read_config_dword(0, device, 0, cap + 4);
+			// uint32_t cap13 = pci_read_config_dword(0, device, 0, cap + 8);
+			// uint32_t cap14 = pci_read_config_dword(0, device, 0, cap + 12);
+			// print_hexdump(&cap1, 4, 9);
+			// print_hexdump(&cap12, 4, 10);
+			// print_hexdump(&cap13, 4, 11);
+			// print_hexdump(&cap14, 4, 12);
 			hba = (HBA_MEM*)ahci_base;
 		}
 	}
 
 	if (hba)
-	{
+	{	
 		hba->ghc |= 1 << 0; // Reset HBA
 		while ((hba->ghc & 0x1) != 0); // Wait for Reset bit to become 0 again
 		//hba->ghc |= 1 << 1; // Enable interrupts
@@ -113,9 +122,7 @@ void stop_cmd(HBA_PORT* port)
 			continue;
 		break;
 	}
-
 }
-
 
 void write(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 {
@@ -132,7 +139,7 @@ void write(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 	memset(cmdtbl, 0, sizeof(HBA_CMD_TBL));
 	cmdtbl->prdt_entry[0].dba = (uint32_t)(data); // Buffer address
 	cmdtbl->prdt_entry[0].dbc = n_sectors * 512 - 1; // Byte count, should be one less than the actual number (important)
-	cmdtbl->prdt_entry[0].i = 1; // Interrupt on completion
+	cmdtbl->prdt_entry[0].i = 0; // Interrupt on completion
 
 	// Set command FIS
 	FIS_REG_H2D* cmdfis = (FIS_REG_H2D*)(cmdtbl->cfis);
@@ -168,6 +175,7 @@ void write(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 		}
 		if (port->is & HBA_PxIS_TFES)   // Task file error
 		{
+			print("Write disk error!    ", 1);
 			break;
 		}
 	}
@@ -189,7 +197,7 @@ void read(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 	memset(cmdtbl, 0, sizeof(HBA_CMD_TBL));
 	cmdtbl->prdt_entry[0].dba = (uint32_t)(data); // Buffer address
 	cmdtbl->prdt_entry[0].dbc = n_sectors * 512 - 1; // Byte count, should be one less than the actual number (important)
-	cmdtbl->prdt_entry[0].i = 1; // Interrupt on completion
+	cmdtbl->prdt_entry[0].i = 0; // Interrupt on completion
 
 	// Set command FIS
 	FIS_REG_H2D* cmdfis = (FIS_REG_H2D*)(cmdtbl->cfis);
@@ -224,9 +232,17 @@ void read(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 		}
 		if (port->is & HBA_PxIS_TFES)   // Task file error
 		{
+			print("Read disk error!   ", 1);
 			break;
 		}
 	}
 
-	//while ((port->is & HBA_PxIS_DPS) == 0); // The HBA shall set the PxIS.DPS bit after completing the data transfer, and if enabled, generate an interrupt.
+	int i = 0;
+	while(i < 10000)
+	{
+		// print_hexdump(&port->is, 4, 9);
+		i++;
+	}
+
+	//while ((port->is & HBA_PxIS_DPS) == 1); // The HBA shall set the PxIS.DPS bit after completing the data transfer, and if enabled, generate an interrupt.
 }

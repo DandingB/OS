@@ -6,6 +6,7 @@
 #include "i686\x86.h"
 #include "i686\idt.h"
 #include "i686\pic.h"
+#include "i686\apic.h"
 
 #define PCI_COMMAND_INTERRUPT_DISABLE (1 << 10)
 #define PCI_INTERRUPT_LINE 0x3C
@@ -118,21 +119,16 @@ void CDECL kmain(uint16_t bootDrive)
 {
 	init_pic();
 	init_idt();
-	init_paging();
+	//init_paging();
 
-	//hba = init_ahci();	
+	//hba = init_ahci();
 
 	clear_screen();
 	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
-
 	setcursor(0, 3);
 
-	//uint32_t command = pci_read_config_dword(0, 4, 0, 0x4);
-	//command |= PCI_COMMAND_INTERRUPT_ENABLE;
-	//pci_write_config_dword(0, 4, 0, 0x4, command);
+	init_apic();
 
-	//uint32_t command2 = pci_read_config_dword(0, 4, 0, PCI_INTERRUPT_LINE);
-	//print_hexdump(&command2, 4, 13);
 
 	//__asm("int $0x2");
 

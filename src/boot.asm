@@ -145,11 +145,11 @@ GDT_start:
         dd 0x0
 
     GDT_code:
-        dw 0xffff       ;Limit
+        dw 0xffff       ;Limit 0-15
         dw 0x0000       ;Base 0-15
         db 0x00         ;Base 16-23
         db 0b10011010   ;Access byte
-        db 0b11001111   ;Limit, Flags
+        db 0b11001111   ;Flags, Limit 16-19
         db 0x00         ;Base 24-31
 
     GDT_data:
