@@ -12,3 +12,22 @@ uint32_t atoi(char* str)
 	}
 	return value;
 }
+
+
+int strcmp(char* str1, char* str2)
+{
+	while (*str1 != '\0')
+	{
+		if (*str1 != *str2)
+			return 1;
+
+		str1++;
+		str2++;
+	}
+
+	if (*str1 != *str2)
+		return 1;
+
+	return 0;
+}
+

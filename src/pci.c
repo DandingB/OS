@@ -36,16 +36,22 @@ uint16_t pci_get_device_id(uint16_t bus, uint16_t device, uint16_t function)
     return (r0 & 0xFFFF);
 }
 
-uint16_t pci_get_class_id(uint16_t bus, uint16_t device, uint16_t function)
+uint8_t pci_get_class_id(uint16_t bus, uint16_t device, uint16_t function)
 {
     uint32_t r0 = pci_config_read(bus, device, function, 0xA);
     return (r0 & 0xFF000000) >> 24;
 }
 
-uint16_t pci_get_subclass_id(uint16_t bus, uint16_t device, uint16_t function)
+uint8_t pci_get_subclass_id(uint16_t bus, uint16_t device, uint16_t function)
 {
     uint32_t r0 = pci_config_read(bus, device, function, 0xA);
     return (r0 & 0x00FF0000) >> 16;
+}
+
+uint8_t pci_get_prog_if(uint16_t bus, uint16_t device, uint16_t function)
+{
+    uint32_t r0 = pci_config_read(bus, device, function, 0xA);
+    return (r0 & 0x0000FF00) >> 8;
 }
 
 uint8_t find_msi_capability(uint32_t bus, uint32_t slot, uint32_t func) 

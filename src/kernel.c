@@ -2,8 +2,9 @@
 #include "stdlib.h"
 #include "stdio.h"
 #include "ahci.h"
+#include "xhci.h"
 #include "pci.h"
-#include "paging.h"
+#include "i686\paging.h"
 #include "i686\x86.h"
 #include "i686\idt.h"
 #include "i686\pic.h"
@@ -12,9 +13,7 @@
 #define PCI_COMMAND_INTERRUPT_DISABLE (1 << 10)
 #define PCI_INTERRUPT_LINE 0x3C
 
-int strcmp(char* str1, char* str2);
 void process_cmd();
-uint32_t stoi(char* str);
 
 int cursor = 0;
 int line = 3;
@@ -75,8 +74,6 @@ void erase_char()
 	cli_temp[cursor] = '\0';
 }
 
-
-
 void key_press(uint8_t key)
 {
 	if (key == 0x01) // Esc
@@ -122,15 +119,15 @@ void CDECL kmain(uint16_t bootDrive)
 	init_idt();
 	//init_paging();
 
-	
+	init_apic();
+	init_xhci();
+	hba = init_ahci();
 
 	clear_screen();
 	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
 	setcursor(0, 3);
 
-	init_apic();
-	hba = init_ahci();
-
+	
 
 	//__asm("int $0x2");
 
@@ -143,25 +140,6 @@ void CDECL kmain(uint16_t bootDrive)
 		__asm("hlt");
 	}
 }
-
-int strcmp(char* str1, char* str2)
-{
-	while (*str1 != '\0')
-	{
-		if (*str1 != *str2)
-			return 1;
-
-		str1++;
-		str2++;
-	}
-
-	if (*str1 != *str2)
-		return 1;
-
-	return 0;
-}
-
-
 
 void process_cmd()
 {
@@ -222,6 +200,50 @@ void process_cmd()
 		}
 
 		return;
+	}
+
+	if (strcmp(cli_temp, "pci") == 0)
+	{
+		if (numArgs == 1)
+		{
+			if (strcmp(args[0], "list") == 0)
+			{
+
+				int tempLine = line + 1;
+				for (uint32_t device = 0; device < 32; device++)
+				{
+					uint16_t vendor = pci_get_vendor_id(0, device, 0);
+					if (vendor == 0xffff) continue;
+
+					uint8_t class = pci_get_class_id(0, device, 0);
+					uint8_t subclass = pci_get_subclass_id(0, device, 0);
+
+					print("-----------------", tempLine); tempLine++;
+					print_hexdump(&class, 1, tempLine); tempLine++;
+					print_hexdump(&subclass, 1, tempLine); tempLine++;
+
+					//tempLine++;
+				}
+			}
+		}
+
+		if (numArgs == 2)
+		{
+			if (strcmp(args[0], "device") == 0)
+			{
+				int tempLine = line + 1;
+
+				uint32_t device = atoi(args[1]);
+
+				uint8_t class = pci_get_class_id(0, device, 0);
+				uint8_t subclass = pci_get_subclass_id(0, device, 0);
+				uint8_t progif = pci_get_prog_if(0, device, 0);
+
+				print_hexdump(&class, 1, tempLine); tempLine++;
+				print_hexdump(&subclass, 1, tempLine); tempLine++;
+				print_hexdump(&progif, 1, tempLine); tempLine++;
+			}
+		}
 	}
 }
 

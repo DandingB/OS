@@ -17,8 +17,8 @@ HBA_MEM* init_ahci()
 		uint16_t vendor = pci_get_vendor_id(0, device, 0);
 		if (vendor == 0xffff) continue;
 
-		uint16_t class = pci_get_class_id(0, device, 0);
-		uint16_t subclass = pci_get_subclass_id(0, device, 0);
+		uint8_t class = pci_get_class_id(0, device, 0);
+		uint8_t subclass = pci_get_subclass_id(0, device, 0);
 		if (class == 0x01 && subclass == 0x06) // We found a PCI device which is a Mass storage and AHCI controller
 		{
 			uint32_t ahci_base = pci_config_read(0, device, 0, 0x24); // Get the ABAR (BAR5)

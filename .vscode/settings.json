@@ -3,6 +3,9 @@
     "files.associations": {
         "x86.h": "c",
         "stdio.h": "c",
-        "idt.h": "c"
+        "idt.h": "c",
+        "paging.h": "c",
+        "ahci.h": "c",
+        "xhci.h": "c"
     }
 }
