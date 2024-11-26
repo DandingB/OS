@@ -25,7 +25,7 @@ call enable_A20
 
 ; Copy the code from sector 2 to memory location 0x7e00
 mov bx, KERNEL_LOCATION
-mov dh, 16
+mov dh, 32
 
 mov ah, 0x02 ; Mode: read sectors from drive
 mov al, dh   ; Sectors to read count

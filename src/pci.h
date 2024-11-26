@@ -1,7 +1,6 @@
 #pragma once
 #include <stdint.h>
 
-// Define PCI MSI capability registers offsets
 #define PCI_MSI_CAP_ID 0x05
 #define PCI_MSI_ADDR_OFFSET 0x04
 #define PCI_MSI_DATA_OFFSET 0xC

@@ -120,14 +120,14 @@ void CDECL kmain(uint16_t bootDrive)
 	//init_paging();
 
 	init_apic();
-	init_xhci();
+	
 	hba = init_ahci();
 
 	clear_screen();
 	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
 	setcursor(0, 3);
 
-	
+	init_xhci();
 
 	//__asm("int $0x2");
 
