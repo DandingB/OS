@@ -20,6 +20,9 @@ int sd = 0;
 
 void interrupt_handler(uint32_t interrupt, uint32_t error)
 {
+	if (interrupt == 0x40)
+		print("AHCI interrupt", 1);
+
 	if (interrupt >= 32)
 	{
 		uint8_t status = inb(0x64);		// Status bits: https://www.win.tue.nl/~aeb/linux/kbd/scancodes-11.html
@@ -32,9 +35,10 @@ void interrupt_handler(uint32_t interrupt, uint32_t error)
 			outb(PIC_2_CTRL, 0x20);
 		outb(PIC_1_CTRL, PIC_CMD_END_OF_INTERRUPT);
 
-		//if (interrupt < 0x20 || interrupt > 0x28) {
-		//	return;
-		//}
+		// if (interrupt < 0x20 || interrupt > 0x28) {
+		// 	apic_send_eoi();
+		// 	return;
+		// }
 
 		//if (interrupt < 0x28) {
 		//	outb(PIC_1_CTRL, PIC_CMD_END_OF_INTERRUPT);
@@ -42,8 +46,9 @@ void interrupt_handler(uint32_t interrupt, uint32_t error)
 		//else {
 		//	outb(PIC_2_CTRL, PIC_CMD_END_OF_INTERRUPT);
 		//}
-		print_hexdump(&sd, 1, 1);
-		sd++;
+		//print_hexdump(&sd, 1, 1);
+		//sd++;
+
 		apic_send_eoi();
 	}
 	else

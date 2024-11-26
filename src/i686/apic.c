@@ -19,29 +19,34 @@
 #define APIC_TIMER_VECTOR   0x20    // Interrupt vector for the timer
 #define APIC_SVR_VECTOR     0xFF    // Spurious interrupt vector
 
-void read_msr(uint32_t msr, uint32_t* lo, uint32_t* hi) {
+void read_msr(uint32_t msr, uint32_t* lo, uint32_t* hi) 
+{
     asm volatile ("rdmsr" : "=a"(*lo), "=d"(*hi) : "c"(msr));
 }
 
-void write_msr(uint32_t msr, uint32_t lo, uint32_t hi) {
+void write_msr(uint32_t msr, uint32_t lo, uint32_t hi) 
+{
     asm volatile ("wrmsr" : : "a"(lo), "d"(hi), "c"(msr));
 }
 
 // Write to an APIC register
-void write_apic(uint32_t reg, uint32_t value) {
+void write_apic(uint32_t reg, uint32_t value) 
+{
     volatile uint32_t *addr = (volatile uint32_t *)(APIC_BASE_ADDRESS + reg);
     *addr = value;
     asm volatile("" : : : "memory");  // Memory barrier
 }
 
 // Read from an APIC register
-uint32_t read_apic(uint32_t reg) {
+uint32_t read_apic(uint32_t reg) 
+{
     volatile uint32_t *addr = (volatile uint32_t *)(APIC_BASE_ADDRESS + reg);
     return *addr;
 }
 
 // Enable the APIC
-void enable_apic() {
+void enable_apic() 
+{
     uint32_t lo, hi;
     read_msr(MSR_APIC_BASE, &lo, &hi);
 
@@ -54,12 +59,14 @@ void enable_apic() {
 }
 
 // Send End of Interrupt (EOI) to APIC
-void apic_send_eoi() {
+void apic_send_eoi() 
+{
     write_apic(APIC_EOI, 0);
 }
 
 // Initialize APIC Timer
-void setup_apic_timer(uint32_t interval) {
+void setup_apic_timer(uint32_t interval) 
+{
     // Set the timer divisor to 16
     write_apic(APIC_TIMER_DIVIDER, APIC_DIV_16);
 
@@ -72,7 +79,8 @@ void setup_apic_timer(uint32_t interval) {
 
 
 // Main APIC initialization function
-void init_apic() {
+void init_apic() 
+{
     enable_apic();                    // Enable the APIC
-    setup_apic_timer(100000000);  // Set up the APIC timer with specified interval
+    //setup_apic_timer(100000000);  // Set up the APIC timer with specified interval
 }

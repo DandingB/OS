@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "stdlib.h"
 #include "stdio.h"
 #include "ahci.h"
 #include "pci.h"
@@ -121,13 +122,14 @@ void CDECL kmain(uint16_t bootDrive)
 	init_idt();
 	//init_paging();
 
-	//hba = init_ahci();
+	
 
 	clear_screen();
 	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
 	setcursor(0, 3);
 
 	init_apic();
+	hba = init_ahci();
 
 
 	//__asm("int $0x2");
@@ -159,18 +161,7 @@ int strcmp(char* str1, char* str2)
 	return 0;
 }
 
-uint32_t stoi(char* str)
-{
-	uint32_t value = 0;
-	while (*str != '\0')
-	{
-		uint32_t digit = *str-0x30;
-		value *= 10;	
-		value += digit;
-		str++;
-	}
-	return value;
-}
+
 
 void process_cmd()
 {
@@ -203,6 +194,16 @@ void process_cmd()
 		return;
 	}
 
+	if (strcmp(cli_temp, "clear") == 0)
+	{
+		if (numArgs == 0)
+		{
+			clear_screen();
+			print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
+			line = 3;
+		}
+	}
+
 	if (strcmp(cli_temp, "read") == 0)
 	{
 		if (numArgs == 1)
@@ -214,7 +215,7 @@ void process_cmd()
 			hba_port0->serr = 0xFFFFFFFF;	// Clear the port error register to 0xFFFFFFFF (otherwise again it will be stuck in BSY forever)
 
 			//write(hba_port0, data, 21, 1);
-			uint32_t sector = stoi(args[0]);
+			uint32_t sector = atoi(args[0]);
 			read(hba_port0, data, (uint64_t)sector, 1);
 			print("                                            ", 23);
 			print(data, 23);

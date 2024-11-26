@@ -3,7 +3,10 @@
 #include "stdio.h"
 #include "i686\x86.h"
 
-#define	AHCI_BASE	0x400000	// 4M
+#define	AHCI_BASE 0x400000	// 4M
+
+#define APIC_BASE 0xFEE00000  // Base address of the APIC
+#define MSI_VECTOR 0x40       // Vector to handle MSI in the IDT
 
 HBA_MEM* init_ahci()
 {
@@ -11,23 +14,29 @@ HBA_MEM* init_ahci()
 
 	for (uint32_t device = 0; device < 32; device++)
 	{
-		uint16_t vendor = getVendorID(0, device, 0);
+		uint16_t vendor = pci_get_vendor_id(0, device, 0);
 		if (vendor == 0xffff) continue;
 
-		uint16_t class = getClassId(0, device, 0);
-		uint16_t subclass = getSubClassId(0, device, 0);
+		uint16_t class = pci_get_class_id(0, device, 0);
+		uint16_t subclass = pci_get_subclass_id(0, device, 0);
 		if (class == 0x01 && subclass == 0x06) // We found a PCI device which is a Mass storage and AHCI controller
 		{
-			uint32_t ahci_base = pci_read_config_dword(0, device, 0, 0x24); // Get the ABAR (BAR5)
-			// uint8_t cap = pci_read_config_dword(0, device, 0, 0x34) & 0x000000FF;
-			// uint32_t cap1 = pci_read_config_dword(0, device, 0, cap);
-			// uint32_t cap12 = pci_read_config_dword(0, device, 0, cap + 4);
-			// uint32_t cap13 = pci_read_config_dword(0, device, 0, cap + 8);
-			// uint32_t cap14 = pci_read_config_dword(0, device, 0, cap + 12);
-			// print_hexdump(&cap1, 4, 9);
-			// print_hexdump(&cap12, 4, 10);
-			// print_hexdump(&cap13, 4, 11);
-			// print_hexdump(&cap14, 4, 12);
+			uint32_t ahci_base = pci_config_read(0, device, 0, 0x24); // Get the ABAR (BAR5)
+			uint8_t msi_cap_offset = find_msi_capability(0, device, 0);
+
+			// Set the MSI address (APIC base with destination ID) and data (vector)
+			uint32_t msi_address = APIC_BASE;  // Local APIC base for this CPU
+			uint32_t msi_data = MSI_VECTOR;    // Interrupt vector to use for MSI
+
+			// Write the MSI address and data
+			pci_config_write(0, device, 0, msi_cap_offset + PCI_MSI_ADDR_OFFSET, msi_address);
+			pci_config_write(0, device, 0, msi_cap_offset + PCI_MSI_DATA_OFFSET, msi_data);
+
+			// Enable MSI by setting the MSI Enable bit in the control register
+			uint32_t msi_control = pci_config_read(0, device, 0, msi_cap_offset);
+			msi_control |= (1 << 16);  // Set MSI Enable bit
+			pci_config_write(0, device, 0, msi_cap_offset, msi_control);
+
 			hba = (HBA_MEM*)ahci_base;
 		}
 	}
@@ -36,7 +45,7 @@ HBA_MEM* init_ahci()
 	{	
 		hba->ghc |= 1 << 0; // Reset HBA
 		while ((hba->ghc & 0x1) != 0); // Wait for Reset bit to become 0 again
-		//hba->ghc |= 1 << 1; // Enable interrupts
+		hba->ghc |= 1 << 1; // Enable interrupts
 
 		for (int i = 0; i < 32; i++)
 		{
@@ -62,6 +71,7 @@ void port_rebase(HBA_PORT* port, int portno)
 	port->sctl = 0x1; // Reset port
 	int i = 0;  while (i < 0xFFFFFF) { i++; } // Wait a little
 	port->sctl = 0x0;
+	port->ie = 0x01;
 
 	// Command list offset: 1K*portno
 	// Command list entry size = 32
@@ -139,7 +149,7 @@ void write(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 	memset(cmdtbl, 0, sizeof(HBA_CMD_TBL));
 	cmdtbl->prdt_entry[0].dba = (uint32_t)(data); // Buffer address
 	cmdtbl->prdt_entry[0].dbc = n_sectors * 512 - 1; // Byte count, should be one less than the actual number (important)
-	cmdtbl->prdt_entry[0].i = 0; // Interrupt on completion
+	cmdtbl->prdt_entry[0].i = 1; // Interrupt on completion
 
 	// Set command FIS
 	FIS_REG_H2D* cmdfis = (FIS_REG_H2D*)(cmdtbl->cfis);
@@ -197,7 +207,7 @@ void read(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 	memset(cmdtbl, 0, sizeof(HBA_CMD_TBL));
 	cmdtbl->prdt_entry[0].dba = (uint32_t)(data); // Buffer address
 	cmdtbl->prdt_entry[0].dbc = n_sectors * 512 - 1; // Byte count, should be one less than the actual number (important)
-	cmdtbl->prdt_entry[0].i = 0; // Interrupt on completion
+	cmdtbl->prdt_entry[0].i = 1; // Interrupt on completion
 
 	// Set command FIS
 	FIS_REG_H2D* cmdfis = (FIS_REG_H2D*)(cmdtbl->cfis);
