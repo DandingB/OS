@@ -5,9 +5,6 @@
 
 #define	AHCI_BASE 0x400000	// 4M
 
-#define APIC_BASE 0xFEE00000  // Base address of the APIC
-#define MSI_VECTOR 0x40       // Vector to handle MSI in the IDT
-
 HBA_MEM* init_ahci()
 {
 	HBA_MEM* hba = 0;
@@ -22,20 +19,8 @@ HBA_MEM* init_ahci()
 		if (class == PCI_CLASS_MASSSTORAGE && subclass == PCI_SUBCLASS_SATA) // We found a PCI device which is a Mass storage and SATA controller
 		{
 			uint32_t ahci_base = pci_config_read(0, device, 0, 0x24); // Get the ABAR (BAR5)
-			uint8_t msi_cap_offset = find_msi_capability(0, device, 0);
-
-			// Set the MSI address (APIC base with destination ID) and data (vector)
-			uint32_t msi_address = APIC_BASE;  // Local APIC base for this CPU
-			uint32_t msi_data = MSI_VECTOR;    // Interrupt vector to use for MSI
-
-			// Write the MSI address and data
-			pci_config_write(0, device, 0, msi_cap_offset + PCI_MSI_ADDR_OFFSET, msi_address);
-			pci_config_write(0, device, 0, msi_cap_offset + PCI_MSI_DATA_OFFSET, msi_data);
-
-			// Enable MSI by setting the MSI Enable bit in the control register
-			uint32_t msi_control = pci_config_read(0, device, 0, msi_cap_offset);
-			msi_control |= (1 << 16);  // Set MSI Enable bit
-			pci_config_write(0, device, 0, msi_cap_offset, msi_control);
+			if (!pci_set_msi(0, device, 0, 0xFEE00000, 0x40))
+				print("no msi found", 10);
 
 			hba = (HBA_MEM*)ahci_base;
 		}

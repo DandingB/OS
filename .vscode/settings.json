@@ -7,5 +7,6 @@
         "paging.h": "c",
         "ahci.h": "c",
         "xhci.h": "c"
-    }
+    },
+    "C_Cpp.errorSquiggles": "disabled"
 }

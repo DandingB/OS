@@ -2,10 +2,9 @@
 #include "pci.h"
 #include "xhci.h"
 
-#define XHCI_CAPLENGTH 0x00 // Capability Register Length
-#define XHCI_USBCMD    0x00 // USB Command Register
-#define XHCI_USBSTS    0x04 // USB Status Register
-#define XHCI_CONFIG    0x38 // Configure Register
+#define DCBAA_BASE 0x500000
+
+void populate_device_context(uint64_t* device_context);
 
 // Function to get the base address of the xHCI controller
 uint32_t get_xhci_base_address(uint8_t bus, uint8_t device, uint8_t function) 
@@ -22,6 +21,7 @@ uint32_t get_xhci_base_address(uint8_t bus, uint8_t device, uint8_t function)
     }
 }
 
+
 uint32_t* init_xhci()
 {
 	uint32_t* xhci_base = 0;
@@ -36,15 +36,15 @@ uint32_t* init_xhci()
         uint8_t progif = pci_get_prog_if(0, device, 0);
 		if (class == PCI_CLASS_SERIALBUS && subclass == PCI_SUBCLASS_USB && progif == PCI_PROGIF_XHCI)
 		{
-			//xhci_base = (uint32_t*)(pci_config_read(0, device, 0, 0x10) & 0xFFFFFF00);
-			xhci_base = get_xhci_base_address(0, device, 0);
+			xhci_base = (uint32_t*)get_xhci_base_address(0, device, 0);
 
-            // Enable bus master in PCI config register
-			uint32_t pci_command = pci_config_read(0, device, 0, 0x04);
+			if (!pci_set_msix(0, device, 0, 0xFEE00000, 0x40))
+			{
+			}
 
+			uint32_t pci_command = pci_config_read(0, device, 0, 0x05);
 			pci_command &= ~PCI_COMMAND_IO;
 			pci_command |= PCI_COMMAND_BUSMASTER | PCI_COMMAND_MEMORY;
-
 			pci_config_write(0, device, 0, 4, pci_command);
 		}
 	}
@@ -54,17 +54,26 @@ uint32_t* init_xhci()
 		volatile XHCI_CAP* cap = (volatile  XHCI_CAP*)xhci_base;
 		volatile XHCI_OP* op = (volatile XHCI_OP*)(xhci_base + ((cap->CAPLENGTH_HCIVERSION & 0xFF) / 4));
 
-		// uint32_t* addr = (uint32_t*)(0xFEBF0000);
-		// uint32_t test = *(addr);
-		// print_hexdump(&test, 4, 7);
+		//volatile uint32_t* addr = (uint32_t*)(0xFEBF0000 + 0x40);
 
-		//*addr = 0xFFFFFF80;
+		op->USBCMD |= (1 << 1);				// Reset controller
+		while (op->USBCMD & (1 << 1));		// and wait
+	
+		op->DCBAAP = DCBAA_BASE;  			// Set Device Context Base Address Array Pointer
+		op->USBCMD |= (1 << 2);	  			// Enable interrupts
+		op->USBCMD |= (1 << 0);	  			// Run
+
+		uint64_t* dcbaa = (uint64_t*)DCBAA_BASE;
+		memset(dcbaa, 0, 256 * sizeof(uint64_t));
 		
-		// test |= (1 << 2) | (1 << 3);
-		// *addr = test;
+		// uint64_t* dc1 = (uint64_t*)0x501000;
+		// populate_device_context(dc1);
+		// dcbaa[0] = dc1;
 
-		// uint32_t test2 = *(addr);
-		// print_hexdump(&test2, 4, 10);
+		// print_hexdump(dc1, 64, 18);
+
+		
+
 
 		// uint16_t ecp = (test >> 16) & 0xFF;
 		// print_hexdump(&ecp, 2, 10);
@@ -103,11 +112,15 @@ uint32_t* init_xhci()
 	return (uint32_t*)xhci_base;
 }
 
-void reset_xhci_controller(uint32_t* mmio_base) 
-{
-    mmio_base[XHCI_USBCMD / 4] &= ~1; // Stop the controller
-    while (mmio_base[XHCI_USBSTS / 4] & (1 << 0)); // Wait until halted
 
-    mmio_base[XHCI_USBCMD / 4] |= (1 << 1); // Reset the controller
-    while (mmio_base[XHCI_USBCMD / 4] & (1 << 1)); // Wait for reset to complete
+void populate_device_context(uint64_t* device_context) 
+{
+	memset(device_context, 0, 4096);
+
+	// uint32_t* slot_context = (uint32_t*)device_context;
+	// slot_context[0] = (device_speed << 20);   // Speed in bits 20-23
+    // slot_context[1] = (device_address << 8);  // Device address in bits 8-14
+
+	// uint32_t* endpoint_context = (uint32_t*)((uint8_t*)device_context + 32); // Endpoint contexts start at offset 32 bytes
+
 }

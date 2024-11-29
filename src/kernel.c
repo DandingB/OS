@@ -129,8 +129,6 @@ void CDECL kmain(uint16_t bootDrive)
 	//hba = init_ahci();
 	xhci = init_xhci();
 
-	
-
 	//__asm("int $0x2");
 
 	int i = 0;
