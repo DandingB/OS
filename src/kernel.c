@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <cpuid.h>
 #include "stdlib.h"
 #include "stdio.h"
 #include "ahci.h"
@@ -20,6 +21,7 @@ int line = 3;
 char cli_temp[75];
 uint32_t mem_alloc = 0x00600000;
 HBA_MEM* hba = 0;
+uint32_t* xhci = 0;
 
 void* malloc_dumb(uint32_t size)
 {
@@ -119,15 +121,15 @@ void CDECL kmain(uint16_t bootDrive)
 	init_idt();
 	//init_paging();
 
-	init_apic();
-	
-	hba = init_ahci();
-
 	clear_screen();
 	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
 	setcursor(0, 3);
 
-	init_xhci();
+	init_apic();
+	//hba = init_ahci();
+	xhci = init_xhci();
+
+	
 
 	//__asm("int $0x2");
 
@@ -179,6 +181,15 @@ void process_cmd()
 			clear_screen();
 			print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
 			line = 3;
+		}
+	}
+
+	if (strcmp(cli_temp, "timer") == 0)
+	{
+		if (numArgs == 1)
+		{
+			uint32_t interval = atoi(args[0]);
+			setup_apic_timer(interval);
 		}
 	}
 

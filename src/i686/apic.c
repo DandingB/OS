@@ -32,7 +32,7 @@ void write_msr(uint32_t msr, uint32_t lo, uint32_t hi)
 // Write to an APIC register
 void write_apic(uint32_t reg, uint32_t value) 
 {
-    volatile uint32_t *addr = (volatile uint32_t *)(APIC_BASE_ADDRESS + reg);
+    volatile uint32_t* addr = (volatile uint32_t*)(APIC_BASE_ADDRESS + reg);
     *addr = value;
     asm volatile("" : : : "memory");  // Memory barrier
 }
@@ -40,7 +40,7 @@ void write_apic(uint32_t reg, uint32_t value)
 // Read from an APIC register
 uint32_t read_apic(uint32_t reg) 
 {
-    volatile uint32_t *addr = (volatile uint32_t *)(APIC_BASE_ADDRESS + reg);
+    volatile uint32_t* addr = (volatile uint32_t*)(APIC_BASE_ADDRESS + reg);
     return *addr;
 }
 
@@ -78,9 +78,7 @@ void setup_apic_timer(uint32_t interval)
 }
 
 
-// Main APIC initialization function
 void init_apic() 
 {
-    enable_apic();                    // Enable the APIC
-    //setup_apic_timer(100000000);  // Set up the APIC timer with specified interval
+    enable_apic(); // Enable the APIC
 }

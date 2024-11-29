@@ -141,6 +141,7 @@ void print_hexdump(void* loc, int size, unsigned int line) {
 
 	while (size > 0)
 	{
+		//uint32_t test = *(uint32_t*)loc
 		uint8_t byte = *(uint8_t*)loc;
 
 		vidmem++;
@@ -151,4 +152,25 @@ void print_hexdump(void* loc, int size, unsigned int line) {
 		loc++;
 		size--;
 	}
+}
+
+void print_hexdump_volatile(volatile uint32_t* loc, unsigned int line) 
+{
+    char* vidmem = (char*)(0xB8000 + (line * 80 * 2));
+    const char hex_chars[] = "0123456789ABCDEF";
+
+    *vidmem++ = '0';
+    *vidmem++ = WHITE_TXT;
+    *vidmem++ = 'x';
+
+    uint32_t value = *loc;
+    for (int i = 0; i < 4; i++) 
+	{
+        uint8_t byte = (value >> (i * 8)) & 0xFF;
+
+		*vidmem++ = WHITE_TXT;
+        *vidmem++ = hex_chars[(byte >> 4) & 0xF];
+        *vidmem++ = WHITE_TXT;
+        *vidmem++ = hex_chars[byte & 0xF];
+    }
 }

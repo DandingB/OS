@@ -20,8 +20,14 @@ int sd = 0;
 
 void interrupt_handler(uint32_t interrupt, uint32_t error)
 {
-	if (interrupt == 0x40)
+	if (interrupt == 0x40) // AHCI interrupt
 		print("AHCI interrupt", 1);
+
+	if (interrupt == 0x20) // Timer interrupt
+	{
+		print_hexdump(&sd, 1, 24);
+		sd++;
+	}
 
 	if (interrupt >= 32)
 	{
@@ -32,13 +38,8 @@ void interrupt_handler(uint32_t interrupt, uint32_t error)
 			key_press(scancode);
 
 		if (interrupt >= 8)
-			outb(PIC_2_CTRL, 0x20);
+			outb(PIC_2_CTRL, PIC_CMD_END_OF_INTERRUPT);
 		outb(PIC_1_CTRL, PIC_CMD_END_OF_INTERRUPT);
-
-		// if (interrupt < 0x20 || interrupt > 0x28) {
-		// 	apic_send_eoi();
-		// 	return;
-		// }
 
 		//if (interrupt < 0x28) {
 		//	outb(PIC_1_CTRL, PIC_CMD_END_OF_INTERRUPT);
@@ -46,8 +47,7 @@ void interrupt_handler(uint32_t interrupt, uint32_t error)
 		//else {
 		//	outb(PIC_2_CTRL, PIC_CMD_END_OF_INTERRUPT);
 		//}
-		//print_hexdump(&sd, 1, 1);
-		//sd++;
+		
 
 		apic_send_eoi();
 	}

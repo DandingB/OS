@@ -1,5 +1,5 @@
 {
-    "C_Cpp.errorSquiggles": "disabled",
+    "C_Cpp.default.includePath": ["C:/Users/Daniel/Documents/GitHub/OS/src/"],
     "files.associations": {
         "x86.h": "c",
         "stdio.h": "c",
