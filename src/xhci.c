@@ -4,7 +4,7 @@
 
 #define DCBAA_BASE 0x500000
 
-void populate_device_context(uint64_t* device_context);
+void populate_device_context(uint32_t* device_context);
 
 // Function to get the base address of the xHCI controller
 uint32_t get_xhci_base_address(uint8_t bus, uint8_t device, uint8_t function) 
@@ -66,7 +66,7 @@ uint32_t* init_xhci()
 		uint64_t* dcbaa = (uint64_t*)DCBAA_BASE;
 		memset(dcbaa, 0, 256 * sizeof(uint64_t));
 		
-		// uint64_t* dc1 = (uint64_t*)0x501000;
+		// uint32_t* dc1 = (uint32_t*)0x501000;
 		// populate_device_context(dc1);
 		// dcbaa[0] = dc1;
 
@@ -113,7 +113,7 @@ uint32_t* init_xhci()
 }
 
 
-void populate_device_context(uint64_t* device_context) 
+void populate_device_context(uint32_t* device_context) 
 {
 	memset(device_context, 0, 4096);
 
