@@ -7,6 +7,8 @@ GCC = $(GCC_PATH)/i686-elf-gcc
 LD = $(GCC_PATH)/i686-elf-ld
 FLAGS = -ffreestanding -m32 -nostdlib -c -O0
 
+OBJ_FILES := $(wildcard bin/*.obj)
+
 default: compile
 
 compile:
@@ -25,4 +27,4 @@ compile:
 	$(GCC) $(FLAGS) "src\i686\pic.c" -o "bin\pic.obj"
 	$(GCC) $(FLAGS) "src\i686\apic.c" -o "bin\apic.obj"
 
-	$(LD) -T linker.ld -nostdlib "bin\boot.obj" "bin\x86.obj" "bin\kernel.obj" "bin\stdio.obj" "bin\stdlib.obj" "bin\pci.obj" "bin\ahci.obj" "bin\xhci.obj" "bin\paging.obj" "bin\idt.obj" "bin\isr.obj" "bin\pic.obj" "bin\apic.obj" -o "bin\OS.bin" --oformat binary
+	$(LD) -T linker.ld -nostdlib $(OBJ_FILES) -o "bin\OS.bin" --oformat binary
