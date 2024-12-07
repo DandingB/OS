@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-#include "i686\x86.h"
+#include "i686/x86.h"
 
 #define WHITE_TXT 0x07
 #define BLACK_TXT 0xF0

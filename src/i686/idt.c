@@ -1,4 +1,4 @@
-#include "..\stdio.h"
+#include "../stdio.h"
 #include "idt.h"
 #include "x86.h"
 #include "pic.h"

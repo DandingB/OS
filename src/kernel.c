@@ -5,11 +5,11 @@
 #include "ahci.h"
 #include "xhci.h"
 #include "pci.h"
-#include "i686\paging.h"
-#include "i686\x86.h"
-#include "i686\idt.h"
-#include "i686\pic.h"
-#include "i686\apic.h"
+#include "i686/paging.h"
+#include "i686/x86.h"
+#include "i686/idt.h"
+#include "i686/pic.h"
+#include "i686/apic.h"
 
 #define PCI_COMMAND_INTERRUPT_DISABLE (1 << 10)
 #define PCI_INTERRUPT_LINE 0x3C

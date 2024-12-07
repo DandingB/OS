@@ -1,7 +1,7 @@
 #include "ahci.h"
 #include "pci.h"
 #include "stdio.h"
-#include "i686\x86.h"
+#include "i686/x86.h"
 
 #define	AHCI_BASE 0x400000	// 4M
 
