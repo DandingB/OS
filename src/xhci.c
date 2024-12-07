@@ -61,7 +61,7 @@ XHCI_BASE init_xhci()
 		volatile XHCI_REG_RT* rts = (volatile XHCI_REG_RT*)(xhci_base + cap->RTSOFF);
 		volatile uint32_t* doorbell = (volatile uint32_t*)(xhci_base + cap->DBOFF);
 
-		volatile void* command_ring = CR_BASE;
+		volatile void* command_ring = (volatile void* )CR_BASE;
 
 		// TODO: Claim ownership
 

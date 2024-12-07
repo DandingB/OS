@@ -4,7 +4,7 @@ GCC_PATH = C:/Users/Daniel/Downloads/i686-elf-tools-windows/bin
 
 NASM = $(NASM_PATH)/nasm
 GCC = i686-elf-gcc
-LD = $(GCC_PATH)/i686-elf-ld
+LD = i686-elf-ld
 FLAGS = -ffreestanding -m32 -nostdlib -c -O0
 
 OBJ_FILES := $(wildcard bin/*.obj)
