@@ -21,7 +21,7 @@ int line = 3;
 char cli_temp[75];
 uint32_t mem_alloc = 0x00600000;
 HBA_MEM* hba = 0;
-uint32_t* xhci = 0;
+XHCI_BASE xhci = 0;
 
 void* malloc_dumb(uint32_t size)
 {
@@ -178,7 +178,7 @@ void process_cmd()
 		{
 			clear_screen();
 			print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
-			line = 3;
+			line = 2;
 		}
 	}
 
@@ -251,6 +251,22 @@ void process_cmd()
 				print_hexdump(&class, 1, tempLine); tempLine++;
 				print_hexdump(&subclass, 1, tempLine); tempLine++;
 				print_hexdump(&progif, 1, tempLine); tempLine++;
+			}
+		}
+	}
+
+	if (strcmp(cli_temp, "xhci") == 0)
+	{
+		if (numArgs == 1)
+		{
+			if (strcmp(args[0], "reset") == 0)
+			{
+				xhci_reset(xhci);
+			}
+
+			if (strcmp(args[0], "ports") == 0)
+			{
+				xhci_ports_list(xhci);
 			}
 		}
 	}

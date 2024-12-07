@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+typedef void* XHCI_BASE;
+
 // Reading from this MMIO is 4-byte aligned, so some fields a consolidated to fit this requirement.
 typedef volatile struct tagXHCI_CAP
 {
@@ -11,7 +13,16 @@ typedef volatile struct tagXHCI_CAP
     uint32_t DBOFF;         // Doorbell Offset 
     uint32_t RTSOFF;        // Runtime Register Space Offset
     uint32_t HCCPARAMS2;    // Capability Parameters 2
-} XHCI_CAP;
+} XHCI_REG_CAP;
+
+typedef volatile struct tagXHCI_PORT
+{
+    uint32_t PORTSC;    // Port Status and Control
+    uint32_t PORTPMSC;  // Port Power Management Status and Control
+    uint32_t PORTLI;    // Port Link Info
+    uint32_t PORTHLPMC; // Port Hardware LPM Control
+
+} XHCI_PORT;
 
 typedef volatile struct tagXHCI_OP
 {
@@ -24,7 +35,37 @@ typedef volatile struct tagXHCI_OP
     uint32_t rsv2[4];
     uint64_t DCBAAP;     // Device Context Base Address Array Pointer
     uint32_t CONFIG;     // Configure
-} XHCI_OP;
+    uint32_t rsv3[241];
+    XHCI_PORT PORTS[1];  // Port Register Sets (Size in HCSPARAMS1 > MaxPorts)
+} XHCI_REG_OP;
 
-uint32_t* init_xhci();
-void reset_xhci_controller(uint32_t* mmio_base);
+typedef volatile struct tagXHCI_IRS
+{
+    uint32_t IMAN;      // Interrupter Management
+    uint32_t IMOD;      // Interrupter Moderation
+    uint32_t ERSTSZ;    // Event Ring Segment Table Size
+    uint32_t RsvdP;
+    uint64_t ERSTBA;    // Event Ring Segment Table Base Address 
+    uint64_t ERDP;      // Event Ring Dequeue Pointer
+
+} XHCI_IRS;
+
+typedef volatile struct tagXHCI_RUNTIME
+{
+    uint32_t MFINDEX;   // Microframe Index 
+    uint32_t RsvdZ[7];
+    XHCI_IRS IR[1];     // Interrupter Register Sets (Size in HCSPARAMS1 > MaxIntrs)
+
+} XHCI_REG_RT;
+
+typedef volatile struct tagEnableSlotCommand
+{
+    uint32_t RsvZ1;
+    uint32_t RsvZ2;
+    uint32_t RsvZ3;
+    uint32_t cmd;
+} EnableSlotCommand;
+
+XHCI_BASE init_xhci();
+void xhci_reset(XHCI_BASE xhci_base);
+void xhci_ports_list(XHCI_BASE xhci_base);

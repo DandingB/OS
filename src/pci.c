@@ -107,7 +107,7 @@ int pci_set_msix(uint32_t bus, uint32_t device, uint32_t func, uint32_t apic_bas
 
     for (uint32_t i = 0; i < table_size; i++)
     {
-        volatile uint32_t* entry = (uint32_t*)((uint8_t*)msix_table_base + i * 16);
+        volatile uint32_t* entry = (uint32_t*)(msix_table_base + i * 4);
 
         entry[0] = apic_base;
         entry[1] = 0;
@@ -117,9 +117,6 @@ int pci_set_msix(uint32_t bus, uint32_t device, uint32_t func, uint32_t apic_bas
 
     msix_control |= (1 << 31);  // Set Enable bit
     pci_config_write(bus, device, func, msix_cap_offset, msix_control);
-
-    // uint32_t test = msix_table_base[6];
-    // print_hexdump(&test, 4, 10);
 
     return 1;
 }
