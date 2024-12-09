@@ -80,8 +80,11 @@ XHCI_BASE init_xhci()
 		op->DCBAAP = DCBAA_BASE;  // Set Device Context Base Address Array Pointer
 
 		// Alloc Event Ring
-		rts->IR[0].ERSTSZ = 1;			// Table Size
+		rts->IR[0].IMAN = (1 << 1); 
+		rts->IR[0].IMOD = (4000 & 0xFFFF) | ((10 & 0xFFFF) << 16);
+		rts->IR[0].ERSTSZ = 32;			// Table Size
 		rts->IR[0].ERSTBA = ER_BASE;	// Table Base Address Pointer
+		rts->IR[0].ERDP = ER_BASE;
 
 		op->USBCMD |= (1 << 2);	  // Enable interrupts
 		op->USBCMD |= (1 << 0);	  // Run
@@ -100,16 +103,31 @@ XHCI_BASE init_xhci()
 		esc->cmd = (1 << 0) | (9 << 10);
 		
 		// Ring doorbell
-		doorbell[0] = (0 << 0);
+		doorbell[0] = 0;
 
-		uint32_t test = doorbell[0];
-		print_hexdump(&test, 4, 3);
+
+		for (int i = 0; i < 100000; i++)
+			print("as", 20);
+
+		//uint32_t test = doorbell[0];
+		//print_hexdump(&test, 4, 3);
+
+		uint64_t IMAN = rts->IR[0].IMAN;
+		uint64_t IMOD = rts->IR[0].IMOD;
+		uint64_t ERSTSZ = rts->IR[0].ERSTSZ;
+		uint64_t ERSTBA = rts->IR[0].ERSTBA;
+		uint64_t ERDP = rts->IR[0].ERDP;
+		print_hexdump(&IMAN, 8, 4);
+		print_hexdump(&IMOD, 8, 5);
+		print_hexdump(&ERSTSZ, 8, 6);
+		print_hexdump(&ERSTBA, 8, 7);
+		print_hexdump(&ERDP, 8, 8);
 		
-		for (int i = 0; i < 1024; i++)
-		{
-			uint64_t test = rts->IR[i].IMAN;
-			print_hexdump(&test, 8, 4+i);
-		}
+		// for (int i = 0; i < 1024; i++)
+		// {
+		// 	uint64_t test = rts->IR[i].IMAN;
+		// 	print_hexdump(&test, 8, 4+i);
+		// }
 
 
 		// uint64_t* devices = op->DCBAAP & ~0x3F;
