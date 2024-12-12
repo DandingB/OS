@@ -19,7 +19,8 @@
 
 
 
-typedef volatile struct tagHBA_PORT {
+typedef volatile struct tagHBA_PORT 
+{
 	uint32_t clb;		 // 0x00, command list base address, 1K-byte aligned
 	uint32_t clbu;		 // 0x04, command list base address upper 32 bits
 	uint32_t fb;         // 0x08, FIS base address, 256-byte aligned

@@ -20,8 +20,11 @@ int sd = 0;
 
 void interrupt_handler(uint32_t interrupt, uint32_t error)
 {
-	if (interrupt == 0x40) // AHCI interrupt
+	if (interrupt == 0x40)
 		print("AHCI interrupt", 1);
+
+	if (interrupt == 0x41) 
+		print("XHCI interrupt", 1);
 
 	if (interrupt == 0x20) // Timer interrupt
 	{

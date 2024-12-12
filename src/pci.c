@@ -103,7 +103,7 @@ int pci_set_msix(uint32_t bus, uint32_t device, uint32_t func, uint32_t apic_bas
     uint32_t bar            = pci_config_read(bus, device, func, PCI_BAR(bir));
     uint64_t table_base     = (bar & ~0xF) + table_offset;
 
-    volatile uint32_t* msix_table_base = (volatile uint32_t*)table_base;
+    uint32_t* msix_table_base = (uint32_t*)((uint32_t)table_base); // Many static casts or the compiler may Yap
 
     for (uint32_t i = 0; i < table_size; i++)
     {
