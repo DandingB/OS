@@ -88,9 +88,18 @@ typedef volatile struct tagXHCI_TRB
 {
 	uint64_t address;
 	uint32_t status;
-	uint32_t flags;
+	uint32_t control;
 } XHCI_TRB;
 
-XHCI_BASE init_xhci();
-void xhci_reset(XHCI_BASE xhci_base);
-void xhci_ports_list(XHCI_BASE xhci_base);
+typedef struct tagXHCI_CONTEXT
+{
+    uint32_t data[8];
+} XHCI_CONTEXT;
+
+void init_xhci();
+void xhci_setup_device();
+
+void xhci_enable_slot_command();
+XHCI_TRB xhci_do_command(XHCI_TRB trb);
+XHCI_TRB* xhci_queue_command(XHCI_TRB trb);
+

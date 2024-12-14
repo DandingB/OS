@@ -7,7 +7,9 @@
         "paging.h": "c",
         "ahci.h": "c",
         "xhci.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "apic.h": "c",
+        "xutility": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

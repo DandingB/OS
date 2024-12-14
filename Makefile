@@ -18,6 +18,7 @@ compile:
 
 	$(GCC) $(FLAGS) "src/kernel.c" -o "bin/kernel.obj"
 	$(GCC) $(FLAGS) "src/stdlib.c" -o "bin/stdlib.obj"
+	$(GCC) $(FLAGS) "src/memory.c" -o "bin/memory.obj"
 	$(GCC) $(FLAGS) "src/stdio.c" -o "bin/stdio.obj"
 	$(GCC) $(FLAGS) "src/pci.c" -o "bin/pci.obj"
 	$(GCC) $(FLAGS) "src/ahci.c" -o "bin/ahci.obj"

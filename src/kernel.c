@@ -5,6 +5,7 @@
 #include "ahci.h"
 #include "xhci.h"
 #include "pci.h"
+#include "memory.h"
 #include "i686/paging.h"
 #include "i686/x86.h"
 #include "i686/idt.h"
@@ -19,16 +20,9 @@ void process_cmd();
 int cursor = 0;
 int line = 3;
 char cli_temp[75];
-uint32_t mem_alloc = 0x00600000;
-HBA_MEM* hba = 0;
-XHCI_BASE xhci = 0;
 
-void* malloc_dumb(uint32_t size)
-{
-	uint32_t addr = mem_alloc;
-	mem_alloc += size;
-	return (void*)addr;
-}
+HBA_MEM* hba = 0;
+
 
 const char ASCIITable[] = {
 	 0 ,  0 , '1', '2',
@@ -127,8 +121,7 @@ void CDECL kmain(uint16_t bootDrive)
 
 	init_apic();
 	//hba = init_ahci();
-	xhci = init_xhci();
-
+	init_xhci();
 	//__asm("int $0x2");
 
 	int i = 0;
@@ -261,13 +254,18 @@ void process_cmd()
 		{
 			if (strcmp(args[0], "reset") == 0)
 			{
-				xhci_reset(xhci);
 			}
 
 			if (strcmp(args[0], "ports") == 0)
 			{
-				xhci_ports_list(xhci);
 			}
+
+			if (strcmp(args[0], "esc") == 0)
+			{
+				//EnableSlotCommand(xhci);
+			}
+
+			
 		}
 	}
 }
