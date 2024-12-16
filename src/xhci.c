@@ -17,6 +17,9 @@ uint64_t* spbaa;		// Scratchpad Base Address Array
 uint8_t iCmdEnqueue = 0;
 uint8_t bCmdCycle = 1;
 
+uint8_t iEventDequeue = 0;
+uint8_t bEventCycle = 1;
+
 
 // Function to get the base address of the xHCI controller
 uint32_t get_xhci_base_address(uint8_t bus, uint8_t device, uint8_t function) 
@@ -86,7 +89,7 @@ void init_xhci()
 		uint8_t maxERST = (cap->HCSPARAMS2 >> 4) & 0b1111;
 		uint8_t contextSize = (cap->HCCPARAMS1 >> 2) & 1;	// 0 = 32 bit contexts, 1 = 64 bit contexts
 
-		print_hexdump(&maxSlots, 1, 3);
+		print_hexdump(&maxERST, 1, 3);
 
 		command_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16);
 		event_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16 * 2);
@@ -95,7 +98,7 @@ void init_xhci()
 
 		memset((void*)dcbaa, 0, sizeof(uint64_t) * (maxSlots+1));
 		memset((void*)command_ring, 0, sizeof(XHCI_TRB) * 4);
-		memset((void*)event_ring, 0, sizeof(XHCI_TRB) * 16);
+		memset((void*)event_ring, 0, sizeof(XHCI_TRB) * 16 * 2);
 
 
 		// Claim ownership
@@ -212,9 +215,7 @@ void init_xhci()
 		xhci_do_command(trb);
 
 
-
-
-
+	
 		print_hexdump(&event_ring[0].control, 4, 4);
 		print_hexdump(&event_ring[1].control, 4, 5);
 		print_hexdump(&event_ring[2].control, 4, 6);
@@ -231,9 +232,6 @@ void init_xhci()
 		print_hexdump(&event_ring[13].control, 4, 17);
 		print_hexdump(&event_ring[14].control, 4, 18);
 		print_hexdump(&event_ring[15].control, 4, 19);
-		print_hexdump(&event_ring[16].control, 4, 20);
-		print_hexdump(&event_ring[17].control, 4, 21);
-		print_hexdump(&event_ring[18].control, 4, 22);
 
 
 		// When receiving an interrupt:
@@ -325,10 +323,12 @@ XHCI_TRB xhci_do_command(XHCI_TRB trb)
 
 	// Wait for completion
 	XHCI_TRB* next_event = (XHCI_TRB*)((uintptr_t)rts->IR[0].ERDP & ~0x08);
+	
 	for (int i = 0; i < 0xFFFF; i++)
 	{
+		uint16_t completion_code = (next_event->status >> 24) & 0xFF;
 		// Is there a new event in the ring? // TODO: Is this really how you check if a new event is present?
-		if (next_event->control & (1 << 0))
+		if ((next_event->control & 1) == bEventCycle && completion_code != 0)
 		{
 			// We have a event, but check TRB type. Must be Command Completion Event
 			uint16_t trb_type = (next_event->control >> 10) & 0x3F;
@@ -336,9 +336,17 @@ XHCI_TRB xhci_do_command(XHCI_TRB trb)
 				break;
 						
 			// It was not the right type. Let's try the next. Increments with sizeof(XHCI_TRB)
-			next_event++; 
+			next_event++;
+			if (next_event >= event_ring + 16)
+			{
+				next_event = event_ring;
+				bEventCycle = !bEventCycle;
+			}
 		}
 	}
+
+
+	XHCI_TRB* event = next_event;
 
 	uint16_t completion_code = (next_event->status >> 24) & 0xFF;
 	uint16_t trb_type 		 = (next_event->control >> 10) & 0x3F;
@@ -348,8 +356,15 @@ XHCI_TRB xhci_do_command(XHCI_TRB trb)
 
 	// TODO: It is recommended that software process as many Events as possible before writing the ERDP
 	next_event++;
+	if (next_event >= event_ring + 16)
+	{
+		next_event = event_ring;
+		bEventCycle = !bEventCycle;
+	}
+
 	rts->IR[0].ERDP = (uintptr_t)next_event; // TODO: (Idea) do_command should not change the dequeue pointer. A interrupt handler should do that, but ignore Command Completion Events
-	return *(next_event-1);
+
+	return *event;
 }
 
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb)
