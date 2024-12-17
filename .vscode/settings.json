@@ -9,7 +9,16 @@
         "xhci.h": "c",
         "stdint.h": "c",
         "apic.h": "c",
-        "xutility": "c"
+        "xutility": "c",
+        "compare": "c",
+        "memory": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c",
+        "xmemory": "c",
+        "xtr1common": "c",
+        "iosfwd": "c",
+        "initializer_list": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

@@ -17,7 +17,9 @@ uint64_t* spbaa;		// Scratchpad Base Address Array
 uint8_t iCmdEnqueue = 0;
 uint8_t bCmdCycle = 1;
 
-uint8_t iEventDequeue = 0;
+uint8_t iTransferEnqueue = 0;
+uint8_t bTransferCycle = 1;
+
 uint8_t bEventCycle = 1;
 
 
@@ -181,41 +183,8 @@ void init_xhci()
 			while (!(op->PORTS[3].PORTSC & PORTSC_PED));
 
 
-		//xhci_setup_device();
-		
-		// uint64_t CRCR = op->CRCR;
-		// uint32_t IMAN = rts->IR[0].IMAN;
-		// uint64_t ERDP = rts->IR[0].ERDP;
+		xhci_setup_device(4);
 
-		// print_hexdump(&CRCR, 8, 5);
-		// print_hexdump(&IMAN, 4, 6);
-		// print_hexdump(&ERDP, 8, 7);
-
-		XHCI_TRB trb;
-		trb.address = 0;
-		trb.status = 0;
-		trb.control = (9 << 10);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-		xhci_do_command(trb);
-
-
-	
 		print_hexdump(&event_ring[0].control, 4, 4);
 		print_hexdump(&event_ring[1].control, 4, 5);
 		print_hexdump(&event_ring[2].control, 4, 6);
@@ -242,37 +211,35 @@ void init_xhci()
 	}
 }
 
-
-void xhci_setup_device()
+// Real ports: 3,4,22
+void xhci_setup_device(uint8_t port)
 {
 	// Enable Slot Command
 	XHCI_TRB trb;
 	trb.address = 0;
 	trb.status = 0;
-	trb.control = (9 << 10);
+	trb.control = TRB_SET_TYPE(ENABLE_SLOT);
 	XHCI_TRB event1 = xhci_do_command(trb);
 
 	// Alloc memory for Device Context
 	XHCI_CONTEXT* dc = (XHCI_CONTEXT*)malloc_aligned(64, sizeof(XHCI_CONTEXT) * 32);
 	memset(dc, 0, sizeof(XHCI_CONTEXT) * 32);
-	uint8_t slot = (event1.control >> 24);
+	uint8_t slot = TRB_GET_SLOT(event1.control);
 	dcbaa[slot] = (uintptr_t)dc;
-
-
-	uint8_t activePort = 5;   											// Real: 3,4,22
-	uint8_t speed = (op->PORTS[activePort].PORTSC >> 10) & 0b1111;
+											
+	uint8_t speed = (op->PORTS[port].PORTSC >> 10) & 0b1111;
 
 	XHCI_TRB* transfer_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16);
 
 	// Construct Input Context
-	XHCI_CONTEXT* inputContext = (XHCI_CONTEXT*)0x450000;
+	XHCI_CONTEXT* inputContext = (XHCI_CONTEXT*)malloc_aligned(64, sizeof(XHCI_CONTEXT) * 33);
 	memset(inputContext, 0, sizeof(XHCI_CONTEXT) * 33);
 	// Input Control Context
 	inputContext[0].data[1] = 0b11; 		 									
 
 	// Slot Context
-	inputContext[1].data[0] = (1 << 27) | (speed << 20) | (0 << 0); 	
-	inputContext[1].data[1] = (activePort << 16);
+	inputContext[1].data[0] = SLOT_SET_CONTEXTENTRIES(1) | SLOT_SET_SPEED(speed) | SLOT_SET_ROUTE(0); 	
+	inputContext[1].data[1] = SLOT_SET_ROOTPORT(port);
 
 	// Endpoint Context
 	inputContext[2].data[0] = (0 << 16) | (0 << 10) | (0 << 8);				// Interval , MaxPStreams , Mult
@@ -284,32 +251,28 @@ void xhci_setup_device()
 	XHCI_TRB trb2;
 	trb2.address = (uintptr_t)inputContext;
 	trb2.status = 0;
-	trb2.control =  (slot << 24) | (11 << 10) | (0 << 9);
+	trb2.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(ADDRESS_DEVICE) | TRB_SET_BSR(0);
 	XHCI_TRB event2 = xhci_do_command(trb2);
 
-	// Create Transfer TRB (Setup Stage)
-	transfer_ring[0].address = ((uint64_t)8 << 48) | ((uint64_t)0 << 32) | (0x100 << 16) | (6 << 8) | (0x80 << 0);
-	transfer_ring[0].status = (0 << 22) | (8 << 0);
-	transfer_ring[0].control = (3 << 16) | (2 << 10) | (1 << 6) | (0 << 5) | (1 << 0);
+	
+	USB_DEVICE_DESCRIPTOR descriptor;
+	xhci_do_transfer_control(slot, transfer_ring, &descriptor);
 
-	// Data Stage
-	uint32_t* data = malloc_aligned(64, 8);
-	transfer_ring[1].address = (uintptr_t)data;
-	transfer_ring[1].status = (0 << 22) | (0 << 17) | (8 << 0);
-	transfer_ring[1].control = (1 << 16) | (3 << 10) | (1 << 0);
+	// Update input context with correct MaxPacketSize
+	inputContext[0].data[1] = 0b10;
+	inputContext[2].data[1] = (descriptor.bMaxPacketSize0 << 16) | (0 << 8) | (4 << 3) | (3 << 1);
+	// Evaluate Context Command
+	XHCI_TRB trb3;
+	trb3.address = (uintptr_t)inputContext;
+	trb3.status = 0;
+	trb3.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(EVALUATE_CONTEXT) | TRB_SET_BSR(0);
+	XHCI_TRB event3 = xhci_do_command(trb3);
 
-	// Status Stage
-	transfer_ring[2].address = 0;
-	transfer_ring[2].status = 0;
-	transfer_ring[2].control = (0 << 16) | (4 << 10) | (1 << 5) | (1 << 0);
-
-	doorbell[slot] = 1;
-
-	XHCI_TRB* next_event = (XHCI_TRB*)((uintptr_t)rts->IR[0].ERDP & ~0x08);
-	while (!(next_event->control & (1 << 0)));
+	XHCI_CONTEXT* deviceContext = (XHCI_CONTEXT*)dcbaa[1];
+	print_hexdump(&deviceContext[1].data[1], 4, 23);
 
 	// TODO: Find maxPacketSize from the device descriptor and update it in the host data
-	print_hexdump(data, 8, 23);
+	print_hexdump(&descriptor, 16, 24);
 }
 
 int ln = 2;
@@ -324,7 +287,8 @@ XHCI_TRB xhci_do_command(XHCI_TRB trb)
 	// Wait for completion
 	XHCI_TRB* next_event = (XHCI_TRB*)((uintptr_t)rts->IR[0].ERDP & ~0x08);
 	
-	for (int i = 0; i < 0xFFFF; i++)
+	//for (int i = 0; i < 0xFFFF; i++)
+	while (1)
 	{
 		uint16_t completion_code = (next_event->status >> 24) & 0xFF;
 		// Is there a new event in the ring? // TODO: Is this really how you check if a new event is present?
@@ -367,6 +331,38 @@ XHCI_TRB xhci_do_command(XHCI_TRB trb)
 	return *event;
 }
 
+XHCI_TRB xhci_do_transfer_control(uint8_t slot, XHCI_TRB* transfer_ring, volatile void* buffer)
+{
+	XHCI_TRB setup;
+	setup.address = TRB_SET_wLength(16) | TRB_SET_wIndex(0) | TRB_SET_wValue(0x100) | TRB_SET_bRequest(6) | TRB_SET_bmRequestType(0x80);
+	setup.status = TRB_SET_INT_TARGET(0) | TRB_SET_TRANSFER_LENGTH(8);
+	setup.control = TRB_SET_TT(IN_DATA) | TRB_SET_TYPE(SETUP_STAGE) | TRB_SET_IDT(1) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
+	xhci_queue_transfer(setup, transfer_ring);
+
+	XHCI_TRB data;
+	data.address = (uintptr_t)buffer;
+	data.status = TRB_SET_INT_TARGET(0) | TRB_SET_TDSIZE(0) | TRB_SET_TRANSFER_LENGTH(16);
+	data.control = TRB_SET_DIR(1) | TRB_SET_TYPE(DATA_STAGE) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
+	xhci_queue_transfer(data, transfer_ring);
+
+	XHCI_TRB status;
+	status.address = 0;
+	status.status = TRB_SET_INT_TARGET(0);
+	status.control = TRB_SET_DIR(0) | TRB_SET_TYPE(STATUS_STAGE) | TRB_SET_IOC(1) | TRB_SET_CYCLE(1);
+	xhci_queue_transfer(status, transfer_ring);
+
+	doorbell[slot] = 1;
+
+	XHCI_TRB* next_event = (XHCI_TRB*)((uintptr_t)rts->IR[0].ERDP & ~0x08);
+	while (1)
+	{
+		uint16_t completion_code = (next_event->status >> 24) & 0xFF;
+		if ((next_event->control & 1) == bEventCycle && completion_code != 0)
+			break;
+	}
+
+}
+
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb)
 {
 	// If last TRB in Command Ring
@@ -386,6 +382,27 @@ XHCI_TRB* xhci_queue_command(XHCI_TRB trb)
 	command_ring[iCmdEnqueue].control = (trb.control & ~1) | (bCmdCycle << 0);
 
 	return &command_ring[iCmdEnqueue++];
+}
+
+XHCI_TRB* xhci_queue_transfer(XHCI_TRB trb, XHCI_TRB* transfer_ring)
+{
+	// If last TRB in Transfer Ring
+	if (iTransferEnqueue == 15)
+	{
+		// Set Link TRB that points to the top
+		transfer_ring[15].address = (uintptr_t)transfer_ring;
+		transfer_ring[15].status = (0 << 22);
+		transfer_ring[15].control = (6 << 10) | (1 << 5) | (1 << 1) | (bTransferCycle << 0);
+
+		iTransferEnqueue = 0;				// Reset enqueue
+		bTransferCycle = !bTransferCycle;	// Flip Cycle
+	}
+
+	transfer_ring[iTransferEnqueue].address = trb.address;
+	transfer_ring[iTransferEnqueue].status = trb.status;
+	transfer_ring[iTransferEnqueue].control = (trb.control & ~1) | (bTransferCycle << 0);
+
+	return &transfer_ring[iTransferEnqueue++];
 }
 
 void xhci_enable_slot_command()

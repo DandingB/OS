@@ -16,6 +16,53 @@
 
 #define ERDP_EHB        (1 << 3)    // Event Handler Busy
 
+// TRB Types
+#define SETUP_STAGE         2
+#define DATA_STAGE          3
+#define STATUS_STAGE        4
+#define ENABLE_SLOT         9
+#define DISABLE_SLOT        10
+#define ADDRESS_DEVICE      11
+#define CONFIGURE_ENDPOINT  12
+#define EVALUATE_CONTEXT    13
+
+// Transfer Types
+#define NO_DATA 0
+#define OUT_DATA 2
+#define IN_DATA 3
+
+// Bit fields
+#define TRB_SET_BSR(bsr)                ((bsr & 1) << 9)
+#define TRB_SET_TYPE(type)              ((type & 0x3F) << 10)
+#define TRB_GET_TYPE(type)              ((type >> 10) & 0x3F)
+#define TRB_SET_SLOT(slot)              (slot << 24)
+#define TRB_GET_SLOT(slot)              (slot >> 24)
+#define TRB_SET_CYCLE(state)            (state & 1)
+
+
+#define TRB_SET_bmRequestType(type)     (type & 0xFF)
+#define TRB_SET_bRequest(req)           ((req & 0xFF) << 8)
+#define TRB_SET_wValue(value)           ((value & 0xFFFF) << 16)
+#define TRB_SET_wIndex(index)           ((uint64_t)(index & 0xFFFF) << 32)
+#define TRB_SET_wLength(length)         ((uint64_t)(length & 0xFFFF) << 48)
+#define TRB_SET_TRANSFER_LENGTH(length) (length & 0x1FFFF)
+#define TRB_SET_INT_TARGET(target)      (target << 22)          // Interrupter Target
+#define TRB_SET_IOC(bool)               ((bool & 1) << 5)       // Interrupt on Completion
+#define TRB_SET_IDT(bool)               ((bool & 1) << 6)       // Immediate Data
+#define TRB_SET_TT(bool)                ((bool & 3) << 16)      // Transfer Type
+#define TRB_SET_TDSIZE(size)            ((size & 0x1F) << 17)   // TD Size
+#define TRB_SET_DIR(dir)                ((dir & 1) << 16)       // Direction
+#define TRB_SET_CH(chain)               ((chain & 1) << 4)        // Chain
+
+#define SLOT_SET_ROUTE(string)          (string)                // Route String
+#define SLOT_SET_SPEED(speed)           ((speed & 0xF) << 20)   // This field indicates the speed of the device.
+#define SLOT_SET_MTT(mtt)               ((mtt & 0x1) << 25)     // Multi-TT
+#define SLOT_SET_HUB(hub)               ((hub & 0x1) << 26)     // This flag is set to '1' by software if this device is a USB hub, or '0' if it is a USB function. 
+#define SLOT_SET_CONTEXTENTRIES(n)      (n << 27)               // Context entries
+#define SLOT_SET_ROOTPORT(port)         ((port & 0xFF) << 16)   // Root hub port number
+#define SLOT_SET_NPORTS(port)           ((port & 0xFF) << 16)   // Number of ports
+
+
 
 
 typedef void* XHCI_BASE;
@@ -72,7 +119,6 @@ typedef volatile struct tagXHCI_RUNTIME
     uint32_t MFINDEX;   // Microframe Index 
     uint32_t rsvdz[7];
     XHCI_IRS IR[1];     // Interrupter Register Sets (Size in HCSPARAMS1 > MaxIntrs)
-
 } XHCI_REG_RT;
 
 
@@ -96,10 +142,33 @@ typedef struct tagXHCI_CONTEXT
     uint32_t data[8];
 } XHCI_CONTEXT;
 
+
+
+typedef volatile struct tagUSB_DEVICE_DESCRIPTOR
+{
+    uint8_t  bLength;
+    uint8_t  bDescriptorType;
+    uint16_t bcdUSB;
+    uint8_t  bDeviceClass;
+    uint8_t  bDeviceSubClass;
+    uint8_t  bDeviceProtocol;
+    uint8_t  bMaxPacketSize0;
+    uint16_t idVendor;
+    uint16_t idProduct;
+    uint16_t bcdDevice;
+    uint8_t  iManufacturer;
+    uint8_t  iProduct;
+    uint8_t  iSerialNumber;
+    uint8_t  bNumConfigurations;
+} __attribute__((packed)) USB_DEVICE_DESCRIPTOR;
+
+
 void init_xhci();
-void xhci_setup_device();
+void xhci_setup_device(uint8_t port);
 
 void xhci_enable_slot_command();
 XHCI_TRB xhci_do_command(XHCI_TRB trb);
+XHCI_TRB xhci_do_transfer_control(uint8_t slot, XHCI_TRB* transfer_ring, volatile void* buffer);
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb);
+XHCI_TRB* xhci_queue_transfer(XHCI_TRB trb, XHCI_TRB* transfer_ring);
 
