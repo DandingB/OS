@@ -26,6 +26,10 @@
 #define CONFIGURE_ENDPOINT  12
 #define EVALUATE_CONTEXT    13
 
+#define TRANSFER_EVENT      32
+#define COMMAND_COMP_EVENT  33
+#define PORT_STATUS_EVENT   34
+
 // Transfer Types
 #define NO_DATA 0
 #define OUT_DATA 2
@@ -38,7 +42,6 @@
 #define TRB_SET_SLOT(slot)              (slot << 24)
 #define TRB_GET_SLOT(slot)              (slot >> 24)
 #define TRB_SET_CYCLE(state)            (state & 1)
-
 
 #define TRB_SET_bmRequestType(type)     (type & 0xFF)
 #define TRB_SET_bRequest(req)           ((req & 0xFF) << 8)
@@ -168,7 +171,7 @@ void xhci_setup_device(uint8_t port);
 
 void xhci_enable_slot_command();
 XHCI_TRB xhci_do_command(XHCI_TRB trb);
-XHCI_TRB xhci_do_transfer_control(uint8_t slot, XHCI_TRB* transfer_ring, volatile void* buffer);
+XHCI_TRB xhci_do_transfer_control(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t length, volatile void* buffer);
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb);
 XHCI_TRB* xhci_queue_transfer(XHCI_TRB trb, XHCI_TRB* transfer_ring);
-
+XHCI_TRB* xhci_dequeue_event(uint8_t trb_type);
