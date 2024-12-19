@@ -5,6 +5,7 @@
 #include "apic.h"
 
 void key_press(uint8_t key);
+void xhci_interrupt_handler();
 
 
 __attribute__((aligned(0x10)))
@@ -13,9 +14,6 @@ static idtr_t idtr;
 
 extern void* isr_stub_table[];
 
-
-
-
 int sd = 0;
 
 void interrupt_handler(uint32_t interrupt, uint32_t error)
@@ -23,8 +21,9 @@ void interrupt_handler(uint32_t interrupt, uint32_t error)
 	if (interrupt == 0x40)
 		print("AHCI interrupt", 1);
 
-	if (interrupt == 0x41) 
-		print("XHCI interrupt", 1);
+	if (interrupt == 0x41)
+		xhci_interrupt_handler();
+		
 
 	if (interrupt == 0x20) // Timer interrupt
 	{

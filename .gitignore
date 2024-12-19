@@ -1,3 +1,5 @@
-hd.img
+.vs/
+.vscode/
 bin/
+hd.img
 .DS_Store

@@ -25,3 +25,4 @@
 
 
 void init_pic();
+void disable_pic();

@@ -169,9 +169,11 @@ typedef volatile struct tagUSB_DEVICE_DESCRIPTOR
 void init_xhci();
 void xhci_setup_device(uint8_t port);
 
-void xhci_enable_slot_command();
 XHCI_TRB xhci_do_command(XHCI_TRB trb);
-XHCI_TRB xhci_do_transfer_control(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t length, volatile void* buffer);
+
+XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t length, volatile void* buffer);
+void xhci_set_configuration(uint8_t slot, XHCI_TRB* transfer_ring);
+
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb);
 XHCI_TRB* xhci_queue_transfer(XHCI_TRB trb, XHCI_TRB* transfer_ring);
 XHCI_TRB* xhci_dequeue_event(uint8_t trb_type);

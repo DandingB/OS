@@ -45,7 +45,7 @@ uint32_t read_apic(uint32_t reg)
 }
 
 // Enable the APIC
-void enable_apic() 
+void enable_apic()
 {
     uint32_t lo, hi;
     read_msr(MSR_APIC_BASE, &lo, &hi);

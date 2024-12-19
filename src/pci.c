@@ -118,5 +118,11 @@ int pci_set_msix(uint32_t bus, uint32_t device, uint32_t func, uint32_t apic_bas
     msix_control |= (1 << 31);  // Set Enable bit
     pci_config_write(bus, device, func, msix_cap_offset, msix_control);
 
+    // uint32_t msix_pba           = pci_config_read(bus, device, func, msix_cap_offset + 0x08);
+    // uint8_t  pba_bir            = msix_pba & 0b111;
+    // uint32_t pba_table_offset   = msix_pba & ~0b111;
+    // uint32_t pba_bar            = pci_config_read(bus, device, func, PCI_BAR(bir));
+    // uint64_t pba_base           = (pba_bar & ~0xF) + pba_table_offset;
+
     return 1;
 }

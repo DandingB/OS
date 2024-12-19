@@ -24,12 +24,25 @@ void init_pic()
 	outb(PIC_2_DATA, ICW4_8086);
 	/* Initialization finished */
 
-	/* mask interrupts */
-	//outb(PIC_1_DATA, 0x00);
-	//outb(PIC_2_DATA, 0x00);
-
 	/* 0xFD is 11111101 - enables only IRQ1 (keyboard)*/
 	outb(PIC_1_DATA, 0b11111101);
 	outb(PIC_2_DATA, 0b11111111);
+}
 
+void disable_pic()
+{
+	outb(PIC_1_CTRL, ICW1_INIT | ICW1_ICW4);
+	outb(PIC_2_CTRL, ICW1_INIT | ICW1_ICW4);
+
+	outb(PIC_1_DATA, 0x20);
+	outb(PIC_2_DATA, 0x28);
+
+	outb(PIC_1_DATA, 4);
+	outb(PIC_2_DATA, 2);
+
+	outb(PIC_1_DATA, ICW4_8086);
+	outb(PIC_2_DATA, ICW4_8086);
+
+	outb(PIC_1_DATA, 0xFF);
+	outb(PIC_2_DATA, 0xFF);
 }
