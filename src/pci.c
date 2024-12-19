@@ -76,12 +76,14 @@ int pci_set_msi(uint32_t bus, uint32_t device, uint32_t func, uint32_t apic_base
     if (msi_cap_offset == 0)
         return 0;
 
+    uint32_t msi_control = pci_config_read(bus, device, func, msi_cap_offset);
+    uint8_t addr_length = (msi_control >> 23) & 1; // 64-bit address?
+
     // Write the MSI address and data
     pci_config_write(bus, device, 0, msi_cap_offset + PCI_MSI_ADDR_OFFSET, apic_base);
-    pci_config_write(bus, device, 0, msi_cap_offset + PCI_MSI_DATA_OFFSET, vector);
+    pci_config_write(bus, device, 0, msi_cap_offset + (addr_length ? PCI_MSI_DATA_OFFSET_64 : PCI_MSI_DATA_OFFSET), vector);
 
      // Enable MSI by setting the MSI Enable bit in the control register
-    uint32_t msi_control = pci_config_read(bus, device, func, msi_cap_offset);
     msi_control |= (1 << 16);  // Set MSI Enable bit
     pci_config_write(bus, device, func, msi_cap_offset, msi_control);
 

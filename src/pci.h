@@ -20,7 +20,8 @@
 #define PCI_CAP_MSIX            0x11
 
 #define PCI_MSI_ADDR_OFFSET     0x04
-#define PCI_MSI_DATA_OFFSET     0x0C
+#define PCI_MSI_DATA_OFFSET     0x08
+#define PCI_MSI_DATA_OFFSET_64  0x0C
 
 
 #define PCI_BAR(i) (0x10 + (0x4 * i))
@@ -37,5 +38,6 @@ uint8_t pci_get_subclass_id(uint16_t bus, uint16_t device, uint16_t function);
 uint8_t pci_get_prog_if(uint16_t bus, uint16_t device, uint16_t function);
 
 uint8_t find_capability(uint32_t bus, uint32_t device, uint32_t func, uint8_t cap);
+uint8_t list_capability(uint32_t bus, uint32_t device, uint32_t func);
 int pci_set_msi(uint32_t bus, uint32_t device, uint32_t func, uint32_t apic_base, uint32_t vector);
 int pci_set_msix(uint32_t bus, uint32_t device, uint32_t func, uint32_t apic_base, uint32_t vector);

@@ -111,7 +111,7 @@ void key_press(uint8_t key)
 
 void CDECL kmain(uint16_t bootDrive)
 {
-	disable_pic();
+	init_pic();
 	init_idt();
 	//init_paging();
 
@@ -120,8 +120,8 @@ void CDECL kmain(uint16_t bootDrive)
 	setcursor(0, 3);
 
 	init_apic();
-	hba = init_ahci();
-	//init_xhci();
+	//hba = init_ahci();
+	init_xhci();
 	//__asm("int $0x2");
 
 

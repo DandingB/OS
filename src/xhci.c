@@ -4,6 +4,8 @@
 #include "memory.h"
 #include "i686/x86.h"
 
+uint32_t xhci_base = 0;
+
 XHCI_REG_CAP* cap;		// Capability registers
 XHCI_REG_OP* op;		// Operational registers
 XHCI_REG_RT* rts;		// Runtime registers
@@ -23,60 +25,9 @@ uint8_t bTransferCycle = 1;
 uint8_t bEventCycle = 1;
 
 
-// Function to get the base address of the xHCI controller
-uint32_t get_xhci_base_address(uint8_t bus, uint8_t device, uint8_t function) 
-{
-    uint32_t bar = pci_config_read(bus, device, function, 0x10); // Read the first BAR
-
-    // Check if it is a memory-mapped BAR
-    if (bar & 0x01) {
-        // I/O port BAR (not common for xHCI)
-        return bar & 0xFFFFFFFC;
-    } else {
-        // Memory-mapped BAR
-        return bar & 0xFFFFFFF0;
-    }
-}
-
-uint64_t calculate_page_size(uint32_t field) 
-{
-    for (int n = 0; n < 32; ++n) 
-	{
-        if (field & (1ULL << n)) 
-            return 1ULL << (n + 12); // Page size: 2^(n+12)
-    }
-    return 0;
-}
-int asd = 0;
-void xhci_interrupt_handler()
-{
-	XHCI_TRB* next_event = (XHCI_TRB*)((uintptr_t)rts->IR[0].ERDP & ~0xF);
-
-	//if ((rts->IR[0].ERDP & ~0xF) != event_ring)
-		next_event++;
-
-	if (next_event >= event_ring + 16)
-	{
-		next_event = event_ring;
-		bEventCycle = !bEventCycle;
-	}
-
-	print("XHCI interrupt!", 1);
-
-
-
-	// Write 1 to clear and set dequeue pointer
-	rts->IR[0].IMAN = IMAN_IE | IMAN_IP;
-	rts->IR[0].ERDP = (uintptr_t)(next_event) | ERDP_EHB;
-
-	uint64_t test = rts->IR[0].ERDP & ~0xF;
-	print_hexdump(&test, 8, 12+(asd++));
-}
 
 void init_xhci()
 {
-	uint32_t xhci_base = 0;
-
     for (uint32_t device = 0; device < 32; device++)
 	{
 		uint16_t vendor = pci_get_vendor_id(0, device, 0);
@@ -90,8 +41,7 @@ void init_xhci()
 			xhci_base = get_xhci_base_address(0, device, 0);
 
 			if (!pci_set_msix(0, device, 0, 0xFEE00000, 0x41))
-			{
-			}
+				print("Failed to setup MSI-X!", 2);
 
 			// Enable the bus master
 			uint32_t pci_command = pci_config_read(0, device, 0, 0x05);
@@ -123,32 +73,9 @@ void init_xhci()
 		memset((void*)command_ring, 0, sizeof(XHCI_TRB) * 4);
 		memset((void*)event_ring, 0, sizeof(XHCI_TRB) * 16 * 2);
 
+		xhci_claim_ownership();
+		xhci_reset_hc();
 
-		// Claim ownership
-		uint32_t xecp = xhci_base + (((cap->HCCPARAMS1 >> 16) & 0xFFFF) << 2);
-		while (1)
-		{
-			uint32_t* cap = (uint32_t*)xecp;
-			uint16_t capId = (*cap & 0xFF);
-			uint16_t offset = ((*cap >> 8) & 0xFF) << 2;
-
-			// We found a "USB Legacy Support" Capability
-			if (capId == 0x01)				
-			{
-				*cap |= (1 << 24);			// Set OS Ownership bit
-				while ((*cap) & (1 << 16));	// Wait for BIOS Ownership bit to clear
-				break;
-			}
-
-			if (offset == 0)
-				break;
-
-			xecp += offset;
-		}
-
-		// Reset the Host Controller & Wait...
-		op->USBCMD |= USBCMD_HCRST;	
-		while (op->USBCMD & USBCMD_HCRST);
 
 		// Setup Event Ring Segment Table
 		XHCI_ERST* segment_table = (XHCI_ERST*)malloc_aligned(64, sizeof(XHCI_ERST) * 2);
@@ -165,12 +92,8 @@ void init_xhci()
 		rts->IR[0].ERSTBA = (uintptr_t)segment_table;			// Table Base Address Pointer
 		rts->IR[0].ERDP = (uintptr_t)(event_ring) & ~ERDP_EHB;	// Dequeue pointer
 
-		uint64_t test = rts->IR[0].ERDP & ~0xF;
-		print_hexdump(&test, 8, 10);
-
 		op->DCBAAP = (uintptr_t)dcbaa;  	  			// Set Device Context Base Address Array Pointer
 		op->CRCR = ((uintptr_t)command_ring & ~0x3F) | 1;  		// The Command Ring Base & Set Cycle Bit = 1
-
 		
 		// Set Max Device Slots Enabled, or else we can't call Enable Slot Command
 		op->CONFIG |= (maxSlots & 0xFF);
@@ -187,40 +110,22 @@ void init_xhci()
 		op->USBCMD |= USBCMD_INTE;	// Enable interrupts
 		op->USBCMD |= USBCMD_RS;	// Run
 		
-		// Reset all ports
-		// uint8_t maxPorts = (cap->HCSPARAMS1 >> 24) & 0xFF;
-		// for (uint8_t i = 0; i < maxPorts; i++)
-		// {
-		// 	op->PORTS[i].PORTSC |= PORTSC_PR;
-		// }
-
-		op->PORTS[4].PORTSC |= PORTSC_PR;
+		 // Reset all ports
+		 uint8_t maxPorts = (cap->HCSPARAMS1 >> 24) & 0xFF;
+		 for (uint8_t i = 0; i < maxPorts; i++)
+		 {
+		 	op->PORTS[i].PORTSC |= PORTSC_PR;
+		 }
 
 		for (int i = 0; i < 100000000; i++);
 
-		print("                      ", 1);
 
+		// USB 1.0 and 2.0 need to be restarted to be enabled (PED)
+		op->PORTS[2].PORTSC |= PORTSC_PR; // Mouse 
+		op->PORTS[3].PORTSC |= PORTSC_PR; // Keyboard
 
-		// // USB 1.0 and 2.0 need to be restarted to be enabled (PED)
-		// op->PORTS[2].PORTSC |= PORTSC_PR; // Mouse 
-		// op->PORTS[3].PORTSC |= PORTSC_PR; // Keyboard
-
-		// if (op->PORTS[3].PORTSC & PORTSC_CCS)
-		// 	while (!(op->PORTS[3].PORTSC & PORTSC_PED));
-
-		command_ring[0].address = 0;
-		command_ring[0].status = 0;
-		command_ring[0].control = TRB_SET_TYPE(ENABLE_SLOT) | TRB_SET_CYCLE(1);
-
-		doorbell[0] = 0;
-
-
-		// XHCI_TRB trb;
-		// trb.address = 0;
-		// trb.status = 0;
-		// trb.control = TRB_SET_TYPE(ENABLE_SLOT);
-		// XHCI_TRB event1 = xhci_do_command(trb);
-
+		if (op->PORTS[3].PORTSC & PORTSC_CCS)
+			while (!(op->PORTS[3].PORTSC & PORTSC_PED));
 
 
 		// When receiving an interrupt:
@@ -231,26 +136,62 @@ void init_xhci()
 
 
 
-		//xhci_setup_device(5);
+		 xhci_setup_device(4);
 
-		// print_hexdump(&event_ring[0].status, 4, 4);
-		// print_hexdump(&event_ring[1].status, 4, 5);
-		// print_hexdump(&event_ring[2].status, 4, 6);
-		// print_hexdump(&event_ring[3].status, 4, 7);
-		// print_hexdump(&event_ring[4].status, 4, 8);
-		// print_hexdump(&event_ring[5].status, 4, 9);
-		// print_hexdump(&event_ring[6].status, 4, 10);
-		// print_hexdump(&event_ring[7].status, 4, 11);
-		// print_hexdump(&event_ring[8].status, 4, 12);
-		// print_hexdump(&event_ring[9].status, 4, 13);
-		// print_hexdump(&event_ring[10].status, 4, 14);
-		// print_hexdump(&event_ring[11].status, 4, 15);
-		// print_hexdump(&event_ring[12].status, 4, 16);
-		// print_hexdump(&event_ring[13].status, 4, 17);
-		// print_hexdump(&event_ring[14].status, 4, 18);
-		// print_hexdump(&event_ring[15].status, 4, 19);
+		 print_hexdump(&event_ring[0].status, 4, 4);
+		 print_hexdump(&event_ring[1].status, 4, 5);
+		 print_hexdump(&event_ring[2].status, 4, 6);
+		 print_hexdump(&event_ring[3].status, 4, 7);
+		 print_hexdump(&event_ring[4].status, 4, 8);
+		 print_hexdump(&event_ring[5].status, 4, 9);
+		 print_hexdump(&event_ring[6].status, 4, 10);
+		 print_hexdump(&event_ring[7].status, 4, 11);
+		 print_hexdump(&event_ring[8].status, 4, 12);
+		 print_hexdump(&event_ring[9].status, 4, 13);
+		 print_hexdump(&event_ring[10].status, 4, 14);
+		 print_hexdump(&event_ring[11].status, 4, 15);
+		 print_hexdump(&event_ring[12].status, 4, 16);
+		 print_hexdump(&event_ring[13].status, 4, 17);
+		 print_hexdump(&event_ring[14].status, 4, 18);
+		 print_hexdump(&event_ring[15].status, 4, 19);
 
 
+	}
+}
+
+void xhci_reset_hc()
+{
+	// Reset the Host Controller & Wait...
+	op->USBCMD |= USBCMD_HCRST;
+	print("HC Resetting", 3);
+	while (op->USBCMD & USBCMD_HCRST);
+	print("               ", 3);
+}
+
+void xhci_reset_ports();
+
+void xhci_claim_ownership()
+{
+	// Claim ownership
+	uint32_t xecp = xhci_base + (((cap->HCCPARAMS1 >> 16) & 0xFFFF) << 2);
+	while (1)
+	{
+		uint32_t* cap = (uint32_t*)xecp;
+		uint16_t capId = (*cap & 0xFF);
+		uint16_t offset = ((*cap >> 8) & 0xFF) << 2;
+
+		// We found a "USB Legacy Support" Capability
+		if (capId == 0x01)
+		{
+			*cap |= (1 << 24);			// Set OS Ownership bit
+			while ((*cap) & (1 << 16));	// Wait for BIOS Ownership bit to clear
+			break;
+		}
+
+		if (offset == 0)
+			break;
+
+		xecp += offset;
 	}
 }
 
@@ -345,7 +286,6 @@ void xhci_setup_device(uint8_t port)
 
 }
 
-int ln = 2;
 
 XHCI_TRB xhci_do_command(XHCI_TRB trb)
 {
@@ -483,6 +423,57 @@ XHCI_TRB* xhci_dequeue_event(uint8_t trb_type)
 		bEventCycle = !bEventCycle;
 	}
 
-	//rts->IR[0].ERDP = (uintptr_t)next_event; // TODO: (Idea) do_command should not change the dequeue pointer. A interrupt handler should do that, but ignore Command Completion Events
+	rts->IR[0].ERDP = (uintptr_t)next_event; // TODO: (Idea) do_command should not change the dequeue pointer. A interrupt handler should do that, but ignore Command Completion Events
 	return event;
+}
+
+
+uint32_t get_xhci_base_address(uint8_t bus, uint8_t device, uint8_t function)
+{
+	uint32_t bar = pci_config_read(bus, device, function, 0x10); // Read the first BAR
+
+	// Check if it is a memory-mapped BAR
+	if (bar & 0x01) {
+		// I/O port BAR (not common for xHCI)
+		return bar & 0xFFFFFFFC;
+	}
+	else {
+		// Memory-mapped BAR
+		return bar & 0xFFFFFFF0;
+	}
+}
+
+uint64_t calculate_page_size(uint32_t field)
+{
+	for (int n = 0; n < 32; ++n)
+	{
+		if (field & (1ULL << n))
+			return 1ULL << (n + 12); // Page size: 2^(n+12)
+	}
+	return 0;
+}
+int asd = 0;
+void xhci_interrupt_handler()
+{
+	//XHCI_TRB* next_event = (XHCI_TRB*)((uintptr_t)rts->IR[0].ERDP & ~0xF);
+
+	////if ((rts->IR[0].ERDP & ~0xF) != event_ring)
+	//	next_event++;
+
+	//if (next_event >= event_ring + 16)
+	//{
+	//	next_event = event_ring;
+	//	bEventCycle = !bEventCycle;
+	//}
+
+	//print("XHCI interrupt!", 1);
+
+
+
+	//// Write 1 to clear and set dequeue pointer
+	//rts->IR[0].IMAN = IMAN_IE | IMAN_IP;
+	//rts->IR[0].ERDP = (uintptr_t)(next_event) | ERDP_EHB;
+
+	//uint64_t test = rts->IR[0].ERDP & ~0xF;
+	//print_hexdump(&test, 8, 12+(asd++));
 }
