@@ -81,10 +81,10 @@ entry:
     or eax, 0b10100000
     mov cr4, eax
 
-    ; Set LME
+    ; Enable LME and Syscall extensions
     mov ecx, 0xC0000080
     rdmsr
-    or eax, 0x00000100
+    or eax, 0x00000101
     wrmsr
 
     ; Set address of PML4
@@ -175,8 +175,8 @@ LongMode:
     xor rdi, rdi
     mov dl, [BOOT_DISK]
 
-    extern kernel_main
-    call kernel_main
+    extern kernel_entry
+    call kernel_entry
     jmp $
 
 
@@ -200,12 +200,27 @@ GDT:
         db 0b00101111   ;Flags (set 64-bit code), Limit 16-19  
         db 0x00         ;Base 24-31
 
-
     GDT_data:
         dw 0xffff
         dw 0x0000
         db 0x00
         db 0b10010010
+        db 0b11001111
+        db 0x00
+
+    GDT_code_user:    
+        dw 0xffff       ;Limit 0-15
+        dw 0x0000       ;Base 0-15
+        db 0x00         ;Base 16-23
+        db 0b11111010   ;Access byte
+        db 0b00101111   ;Flags (set 64-bit code), Limit 16-19  
+        db 0x00         ;Base 24-31
+
+    GDT_data_user:
+        dw 0xffff
+        dw 0x0000
+        db 0x00
+        db 0b11110010
         db 0b11001111
         db 0x00
       

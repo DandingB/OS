@@ -11,5 +11,8 @@ void* memset(void* dest, uint8_t val, uint32_t size);
 
 void reboot();
 
+void enable_syscall(uint64_t syscall_handler);
+void sysret(uint64_t ip, uint64_t flags, uint64_t sp);
+
 
 

@@ -3,7 +3,6 @@
 #define PAGE_PRESENT	(1 << 0)
 #define PAGE_WRITE		(1 << 1)
 #define PAGE_USER		(1 << 2)
-#define PAGE_USER		(1 << 2)
 
 typedef uint64_t page_directory_entry_t;
 typedef uint64_t page_table_entry_t;

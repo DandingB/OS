@@ -1,5 +1,7 @@
 [bits 64]
 
+extern tmp_rsp
+
 	%macro isr_err_stub 1
 	isr_stub_%+%1:
 		mov rdi, %1			; Move interrupt number into rdi
@@ -12,7 +14,6 @@
 	isr_stub_%+%1:
 		mov rdi, %1			; Move interrupt number into rdi
 		mov rsi, 0		; Move dummy error code into rsi
-		mov rdi, %1
 		call interrupt_handler
 		iretq
 	%endmacro

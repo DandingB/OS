@@ -28,8 +28,8 @@ void init_paging()
     init_kernel_page_directory();
 
     // Set temp pml4 with pdpt
-    pdpt[0] = ((uintptr_t)page_directory) | PAGE_WRITE | PAGE_PRESENT;
-    pml4[0] = ((uintptr_t)pdpt) | PAGE_WRITE | PAGE_PRESENT;
+    pdpt[0] = ((uintptr_t)page_directory) | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
+    pml4[0] = ((uintptr_t)pdpt) | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
 
     set_pml4(pml4);
 }
@@ -42,10 +42,10 @@ void init_kernel_page_directory()
     init_page_table(&PAGE_TABLE(page_table, 2), 0x400000);
     init_page_table(&PAGE_TABLE(page_table, 3), 0x600000);
 
-    page_directory[0] = ((uintptr_t)&PAGE_TABLE(page_table, 0)) | PAGE_WRITE | PAGE_PRESENT;
-    page_directory[1] = ((uintptr_t)&PAGE_TABLE(page_table, 1)) | PAGE_WRITE | PAGE_PRESENT;
-    page_directory[2] = ((uintptr_t)&PAGE_TABLE(page_table, 2)) | PAGE_WRITE | PAGE_PRESENT;
-    page_directory[3] = ((uintptr_t)&PAGE_TABLE(page_table, 3)) | PAGE_WRITE | PAGE_PRESENT;
+    page_directory[0] = ((uintptr_t)&PAGE_TABLE(page_table, 0)) | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
+    page_directory[1] = ((uintptr_t)&PAGE_TABLE(page_table, 1)) | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
+    page_directory[2] = ((uintptr_t)&PAGE_TABLE(page_table, 2)) | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
+    page_directory[3] = ((uintptr_t)&PAGE_TABLE(page_table, 3)) | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
 
     iPageTable = 4;
 }
@@ -54,7 +54,7 @@ void init_page_table(page_table_entry_t* page_table, uint64_t paddr_start)
 {
     for (int i = 0; i < PAGE_ENTRIES; i++)
     {
-        page_table[i] = (paddr_start + i * PAGE_SIZE) | PAGE_WRITE | PAGE_PRESENT;
+        page_table[i] = (paddr_start + i * PAGE_SIZE) | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
     }
 }
 
@@ -75,7 +75,7 @@ void* map_page_table(uint64_t paddr_start)
     // Map page table to physical address
     init_page_table(&PAGE_TABLE(page_table, iPageTable), paddr_start);
 
-    page_directory[iPageTable] = ((uintptr_t)&PAGE_TABLE(page_table, iPageTable)) | PAGE_WRITE | PAGE_PRESENT;
+    page_directory[iPageTable] = ((uintptr_t)&PAGE_TABLE(page_table, iPageTable)) | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;
 
     return (void*)(iPageTable++ * 0x200000UL);
 }

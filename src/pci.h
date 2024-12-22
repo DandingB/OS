@@ -26,6 +26,9 @@
 
 #define PCI_BAR(i) (0x10 + (0x4 * i))
 
+#define PCI_COMMAND_INTERRUPT_DISABLE (1 << 10)
+#define PCI_INTERRUPT_LINE 0x3C
+
 
 
 uint32_t pci_config_read(uint8_t bus, uint8_t device, uint8_t function, uint8_t offset);

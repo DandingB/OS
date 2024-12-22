@@ -38,8 +38,7 @@ void init_xhci()
 		if (class == PCI_CLASS_SERIALBUS && subclass == PCI_SUBCLASS_USB && progif == PCI_PROGIF_XHCI)
 		{
 			xhci_base = get_xhci_base_address(0, device, 0);
-
-			xhci_base = map_page_table(xhci_base);
+			xhci_base = (uintptr_t)map_page_table(xhci_base);
 
 			//if (!pci_set_msix(0, device, 0, 0xFEE00000, 0x41))
 			//	print("Failed to setup MSI-X!", 2);

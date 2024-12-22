@@ -5,6 +5,8 @@
 [global inl]
 [global memset]
 [global reboot]
+[global enable_syscall]
+[global sysret]
 
 section .text
 
@@ -54,3 +56,30 @@ section .text
 
 		mov al, 0xFC
 		out 0x64, al
+
+
+	enable_syscall:
+		mov rcx, 0xC0000082
+		rdmsr
+		mov eax, edi
+		wrmsr
+
+		mov rcx, 0xC0000080
+		rdmsr
+		or eax, 1
+		wrmsr
+
+		mov rcx, 0xC0000081
+		rdmsr
+		mov edx, 0x00180008
+		wrmsr
+
+		ret
+
+	
+	sysret:
+		mov rcx, rdi
+		mov r11, rsi
+		;mov rsp, rdx
+		;mov rbp, rdx
+		o64 sysret	;sysretq

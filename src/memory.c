@@ -1,6 +1,7 @@
 #include "memory.h"
+#include "stdio.h"
 
-uint32_t mem_alloc = 0x00500000;
+uintptr_t mem_alloc = 0x00500000;
 
 void* malloc(uint32_t size)
 {

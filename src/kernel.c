@@ -12,9 +12,6 @@
 #include "i686/pic.h"
 #include "i686/apic.h"
 
-#define PCI_COMMAND_INTERRUPT_DISABLE (1 << 10)
-#define PCI_INTERRUPT_LINE 0x3C
-
 void process_cmd();
 void load_program(uint64_t sector);
 
@@ -23,6 +20,8 @@ int line = 3;
 char cli_temp[75];
 
 HBA_MEM* hba = 0;
+
+uint64_t tmp_rsp = 0;
 
 
 const char ASCIITable[] = {
@@ -42,6 +41,52 @@ const char ASCIITable[] = {
 	'.', '/',  0 , '*',
 	 0 , ' '
 };
+void syscall_entry()
+{
+	uint64_t rsp;
+	uint64_t rip;
+	uint64_t flags;
+	asm("mov %%rcx, %0" : "=r"(rip) : );
+	asm("mov %%r11, %0" : "=r"(flags) : );
+	asm("mov %%rsp, %0" : "=r"(rsp) : );
+
+	print("Syscall!", 10);
+
+	sysret(rip, flags, 0x00500000UL);
+	//__asm volatile("sysretq");
+}
+
+void read_msr(uint32_t msr, uint32_t* lo, uint32_t* hi);
+void write_msr(uint32_t msr, uint32_t lo, uint32_t hi);
+
+void kernel_entry(uint16_t bootDrive)
+{
+	init_paging();
+	init_idt();
+	init_pic();
+	init_apic();
+
+	clear_screen();
+	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
+	setcursor(0, 3);
+
+	hba = init_ahci();
+
+
+	write_msr(0xC0000081, 0, 0x00180008);
+	write_msr(0xC0000082, (uintptr_t)syscall_entry, 0);
+	write_msr(0xC0000084, (1 << 9), 0); // Clear the IF flag
+
+	//init_xhci();
+	//__asm("int $0x2");
+
+
+	//asm("mov %%rsp, %0" : "=r"(tmp_rsp) : );
+	load_program(100);
+
+
+	__asm("hlt");
+}
 
 char translate(uint8_t scancode)
 {
@@ -106,33 +151,6 @@ void key_press(uint8_t key)
 	}
 	else if (key > 0x81 && key < 0xD8)
 	{
-	}
-}
-
-
-void kernel_main(uint16_t bootDrive)
-{
-	init_paging();
-	init_idt();
-	init_pic();
-	init_apic();
-
-	clear_screen();
-	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
-	setcursor(0, 3);
-
-	//hba = init_ahci();
-	//init_xhci();
-	//__asm("int $0x2");
-
-
-	int i = 0;
-	while (1)
-	{
-		//print_int(i);
-		//i++;
-
-		__asm("hlt");
 	}
 }
 
@@ -213,7 +231,7 @@ void process_cmd()
 			uint32_t sector = atoi(args[0]);
 			load_program(sector);
 
-			print_hexdump((void*)0x00A00000, 182, 5);
+			print_hexdump((void*)0x00600000, 182, 5);
 		}
 	}
 
@@ -289,13 +307,23 @@ void start_process(uint32_t entry_point, uint32_t stack_top)
 {
 }
 
+void test()
+{
+	print("hellosa!", 15);
+	//asm volatile ("syscall");
+	print("hellosa 2! ", 7);
+	while (1);
+}
+
 void load_program(uint64_t sector)
 {
 	//void* program = malloc_aligned(16, 512);
 	HBA_PORT* hba_port0 = (HBA_PORT*)&hba->ports[0];
 	hba_port0->serr = 0xFFFFFFFF;	// Clear the port error register to 0xFFFFFFFF (otherwise again it will be stuck in BSY forever)
-	read(hba_port0, (void*)0x00A00000UL, sector, 1);
-	//((void(*)(void))0x00A00000)();
+	read(hba_port0, (void*)0x00600000UL, sector, 1);
+	//((void(*)(void))0x00600000UL)();
+
+	sysret(test, 0x202, 0x00500000UL);
 }
 
 
