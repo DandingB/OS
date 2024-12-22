@@ -3,7 +3,7 @@
 
 #define MSR_APIC_BASE 0x1B
 #define APIC_ENABLE (1 << 11)
-#define APIC_BASE_ADDRESS 0xFEE00000
+#define APIC_BASE_ADDRESS 0x800000
 
 // APIC Register Offsets
 #define APIC_SVR            0xF0    // Spurious Interrupt Vector Register

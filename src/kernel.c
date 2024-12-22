@@ -16,6 +16,7 @@
 #define PCI_INTERRUPT_LINE 0x3C
 
 void process_cmd();
+void load_program(uint64_t sector);
 
 int cursor = 0;
 int line = 3;
@@ -120,8 +121,8 @@ void CDECL kmain(uint16_t bootDrive)
 	setcursor(0, 3);
 
 	init_apic();
-	//hba = init_ahci();
-	init_xhci();
+	hba = init_ahci();
+	//init_xhci();
 	//__asm("int $0x2");
 
 
@@ -205,6 +206,17 @@ void process_cmd()
 		return;
 	}
 
+	if (strcmp(cli_temp, "exe") == 0)
+	{
+		if (numArgs == 1)
+		{
+			uint32_t sector = atoi(args[0]);
+			load_program(sector);
+
+			print_hexdump(0x00A00000, 182, 5);
+		}
+	}
+
 	if (strcmp(cli_temp, "pci") == 0)
 	{
 		if (numArgs == 1)
@@ -269,7 +281,21 @@ void process_cmd()
 			
 		}
 	}
+
+
 }
 
+void start_process(uint32_t entry_point, uint32_t stack_top) 
+{
+}
+
+void load_program(uint64_t sector)
+{
+	//void* program = malloc_aligned(16, 512);
+	HBA_PORT* hba_port0 = (HBA_PORT*)&hba->ports[0];
+	hba_port0->serr = 0xFFFFFFFF;	// Clear the port error register to 0xFFFFFFFF (otherwise again it will be stuck in BSY forever)
+	read(hba_port0, 0x00A00000, sector, 1);
+	//((void(*)(void))0x00A00000)();
+}
 
 

@@ -24,8 +24,6 @@ uint8_t bTransferCycle = 1;
 
 uint8_t bEventCycle = 1;
 
-
-
 void init_xhci()
 {
     for (uint32_t device = 0; device < 32; device++)
@@ -40,8 +38,8 @@ void init_xhci()
 		{
 			xhci_base = get_xhci_base_address(0, device, 0);
 
-			if (!pci_set_msix(0, device, 0, 0xFEE00000, 0x41))
-				print("Failed to setup MSI-X!", 2);
+			//if (!pci_set_msix(0, device, 0, 0xFEE00000, 0x41))
+			//	print("Failed to setup MSI-X!", 2);
 
 			// Enable the bus master
 			uint32_t pci_command = pci_config_read(0, device, 0, 0x05);
@@ -59,15 +57,12 @@ void init_xhci()
 		doorbell = (uint32_t*)(xhci_base + cap->DBOFF);
 
 		uint8_t maxSlots = cap->HCSPARAMS1 & 0xFF; // Max 256
-		uint64_t pageSize = calculate_page_size(op->PAGESIZE);
-		uint16_t maxScratchpad = ((cap->HCSPARAMS2 >> 16) & 0x3E0) | (cap->HCSPARAMS2 >> 27);
 		uint8_t maxERST = (cap->HCSPARAMS2 >> 4) & 0b1111;
 		uint8_t contextSize = (cap->HCCPARAMS1 >> 2) & 1;	// 0 = 32 bit contexts, 1 = 64 bit contexts
 
 		command_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16);
 		event_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16 * 2);
 		dcbaa = (uint64_t*)malloc_aligned(64, sizeof(uint64_t) * (maxSlots+1));
-		spbaa = (uint64_t*)malloc_aligned(64, sizeof(uint64_t) * maxScratchpad);
 
 		memset((void*)dcbaa, 0, sizeof(uint64_t) * (maxSlots+1));
 		memset((void*)command_ring, 0, sizeof(XHCI_TRB) * 4);
@@ -75,22 +70,8 @@ void init_xhci()
 
 		xhci_claim_ownership();
 		xhci_reset_hc();
-
-
-		// Setup Event Ring Segment Table
-		XHCI_ERST* segment_table = (XHCI_ERST*)malloc_aligned(64, sizeof(XHCI_ERST) * 2);
-		memset(segment_table, 0, sizeof(XHCI_ERST) * 2);
-		segment_table[0].address = (uintptr_t)&event_ring[0];
-		segment_table[0].size = 16;
-		// segment_table[1].address = (uintptr_t)&event_ring[16];
-		// segment_table[1].size = 16;
-
-		// Setup Interrupter Register Set 0
-		rts->IR[0].IMAN |= IMAN_IE; 
-		rts->IR[0].IMOD = (0 & 0xFFFF) | ((0 & 0xFFFF) << 16);
-		rts->IR[0].ERSTSZ = 1;									// Table Size
-		rts->IR[0].ERSTBA = (uintptr_t)segment_table;			// Table Base Address Pointer
-		rts->IR[0].ERDP = (uintptr_t)(event_ring) & ~ERDP_EHB;	// Dequeue pointer
+		xhci_alloc_scratchpad();
+		xhci_setup_interrupter_register(0, event_ring);
 
 		op->DCBAAP = (uintptr_t)dcbaa;  	  			// Set Device Context Base Address Array Pointer
 		op->CRCR = ((uintptr_t)command_ring & ~0x3F) | 1;  		// The Command Ring Base & Set Cycle Bit = 1
@@ -98,27 +79,10 @@ void init_xhci()
 		// Set Max Device Slots Enabled, or else we can't call Enable Slot Command
 		op->CONFIG |= (maxSlots & 0xFF);
 
-		// Alloc scratchpad buffers
-		for (int i = 0; i < maxScratchpad; i++)
-		{
-			uint32_t* page = malloc_aligned(64, pageSize);
-			memset(page, 0, pageSize);
-			spbaa[i] = (uintptr_t)page;
-		}
-		dcbaa[0] = (uintptr_t)spbaa;		// Index 0 in DCBAA is reserved for scratchpad array (if maxScratchpad > 0)
-
 		op->USBCMD |= USBCMD_INTE;	// Enable interrupts
 		op->USBCMD |= USBCMD_RS;	// Run
-		
-		 // Reset all ports
-		 uint8_t maxPorts = (cap->HCSPARAMS1 >> 24) & 0xFF;
-		 for (uint8_t i = 0; i < maxPorts; i++)
-		 {
-		 	op->PORTS[i].PORTSC |= PORTSC_PR;
-		 }
 
-		for (int i = 0; i < 100000000; i++);
-
+		xhci_reset_ports();
 
 		// USB 1.0 and 2.0 need to be restarted to be enabled (PED)
 		op->PORTS[2].PORTSC |= PORTSC_PR; // Mouse 
@@ -135,8 +99,7 @@ void init_xhci()
 		// 4) Update the Dequeue Pointer to point to the last TD processed, clearing the EHB bit at the same time
 
 
-
-		 xhci_setup_device(4);
+		 xhci_setup_device(5);
 
 		 print_hexdump(&event_ring[0].status, 4, 4);
 		 print_hexdump(&event_ring[1].status, 4, 5);
@@ -163,12 +126,28 @@ void xhci_reset_hc()
 {
 	// Reset the Host Controller & Wait...
 	op->USBCMD |= USBCMD_HCRST;
-	print("HC Resetting", 3);
+	//print("HC Resetting", 3); // TODO: Maybe a memory barrier here
 	while (op->USBCMD & USBCMD_HCRST);
-	print("               ", 3);
+	//print("               ", 3);
 }
 
-void xhci_reset_ports();
+void xhci_reset_ports()
+{
+	// Reset all ports
+	uint8_t maxPorts = (cap->HCSPARAMS1 >> 24) & 0xFF;
+	for (uint8_t i = 0; i < maxPorts; i++)
+	{
+		op->PORTS[i].PORTSC |= PORTSC_PR;
+	}
+
+	for (int i = 0; i < 0xFFFF; i++);
+
+	for (uint8_t i = 0; i < maxPorts; i++)
+	{
+		uint32_t test = op->PORTS[i].PORTSC;
+		print_hexdump(&test, 4, 4 + i);
+	}
+}
 
 void xhci_claim_ownership()
 {
@@ -193,6 +172,39 @@ void xhci_claim_ownership()
 
 		xecp += offset;
 	}
+}
+
+void xhci_setup_interrupter_register(uint16_t reg, XHCI_TRB* er)
+{
+	// Setup Event Ring Segment Table
+	XHCI_ERST* segment_table = (XHCI_ERST*)malloc_aligned(64, sizeof(XHCI_ERST) * 1);
+	memset(segment_table, 0, sizeof(XHCI_ERST) * 1);
+	segment_table[0].address = (uintptr_t)&er[0];
+	segment_table[0].size = 16;
+
+	// Setup Interrupter Register Set 0
+	rts->IR[reg].IMAN |= IMAN_IE;
+	rts->IR[reg].IMOD = (0 & 0xFFFF) | ((0 & 0xFFFF) << 16);
+	rts->IR[reg].ERSTSZ = 1;									// Table Size
+	rts->IR[reg].ERSTBA = (uintptr_t)segment_table;				// Table Base Address Pointer
+	rts->IR[reg].ERDP = (uintptr_t)(er) & ~ERDP_EHB;			// Dequeue pointer
+}
+
+void xhci_alloc_scratchpad()
+{
+	uint64_t pageSize = calculate_page_size(op->PAGESIZE);
+	uint16_t maxScratchpad = ((cap->HCSPARAMS2 >> 16) & 0x3E0) | (cap->HCSPARAMS2 >> 27);
+
+	spbaa = (uint64_t*)malloc_aligned(64, sizeof(uint64_t) * maxScratchpad);
+
+	// Alloc scratchpad buffers
+	for (int i = 0; i < maxScratchpad; i++)
+	{
+		uint32_t* page = malloc_aligned(64, pageSize);
+		memset(page, 0, pageSize);
+		spbaa[i] = (uintptr_t)page;
+	}
+	dcbaa[0] = (uintptr_t)spbaa;		// Index 0 in DCBAA is reserved for scratchpad array (if maxScratchpad > 0)
 }
 
 // Real ports: 3,4,22
@@ -230,7 +242,6 @@ void xhci_setup_device(uint8_t port)
 	inputContext[2].data[2] = ((uintptr_t)transfer_ring) | (1 << 0);		// TRDequeuePointer , DCS
 	inputContext[2].data[4] = (32 << 0);									// AverageTRBLength
 
-
 	// Address Device Command
 	XHCI_TRB trb2;
 	trb2.address = (uintptr_t)inputContext;
@@ -241,7 +252,6 @@ void xhci_setup_device(uint8_t port)
 	// Get Device Descriptor
 	USB_DEVICE_DESCRIPTOR descriptor;
 	xhci_get_descriptor(slot, transfer_ring, 16, &descriptor);
-
 
 	// Update input context with correct MaxPacketSize
 	inputContext[0].data[1] = 0b010;
@@ -338,7 +348,7 @@ void xhci_set_configuration(uint8_t slot, XHCI_TRB* transfer_ring)
 
 	doorbell[slot] = 1; // Ring Default Endpoint
 
-	xhci_dequeue_event(TRANSFER_EVENT);
+	//xhci_dequeue_event(TRANSFER_EVENT);
 }
 
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb)
