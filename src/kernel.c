@@ -110,18 +110,18 @@ void key_press(uint8_t key)
 }
 
 
-void CDECL kmain(uint16_t bootDrive)
+void kernel_main(uint16_t bootDrive)
 {
-	init_pic();
+	init_paging();
 	init_idt();
-	//init_paging();
+	init_pic();
+	init_apic();
 
 	clear_screen();
 	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
 	setcursor(0, 3);
 
-	init_apic();
-	hba = init_ahci();
+	//hba = init_ahci();
 	//init_xhci();
 	//__asm("int $0x2");
 
@@ -213,7 +213,7 @@ void process_cmd()
 			uint32_t sector = atoi(args[0]);
 			load_program(sector);
 
-			print_hexdump(0x00A00000, 182, 5);
+			print_hexdump((void*)0x00A00000, 182, 5);
 		}
 	}
 
@@ -294,7 +294,7 @@ void load_program(uint64_t sector)
 	//void* program = malloc_aligned(16, 512);
 	HBA_PORT* hba_port0 = (HBA_PORT*)&hba->ports[0];
 	hba_port0->serr = 0xFFFFFFFF;	// Clear the port error register to 0xFFFFFFFF (otherwise again it will be stuck in BSY forever)
-	read(hba_port0, 0x00A00000, sector, 1);
+	read(hba_port0, (void*)0x00A00000UL, sector, 1);
 	//((void(*)(void))0x00A00000)();
 }
 

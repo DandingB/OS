@@ -1,9 +1,9 @@
 #include <stdint.h>
+#include "paging.h"
 #include "../stdio.h"
 
 #define MSR_APIC_BASE 0x1B
 #define APIC_ENABLE (1 << 11)
-#define APIC_BASE_ADDRESS 0x800000
 
 // APIC Register Offsets
 #define APIC_SVR            0xF0    // Spurious Interrupt Vector Register
@@ -19,6 +19,8 @@
 #define APIC_TIMER_VECTOR   0x20    // Interrupt vector for the timer
 #define APIC_SVR_VECTOR     0xFF    // Spurious interrupt vector
 
+uintptr_t apic_base = 0;
+
 void read_msr(uint32_t msr, uint32_t* lo, uint32_t* hi) 
 {
     asm volatile ("rdmsr" : "=a"(*lo), "=d"(*hi) : "c"(msr));
@@ -32,7 +34,7 @@ void write_msr(uint32_t msr, uint32_t lo, uint32_t hi)
 // Write to an APIC register
 void write_apic(uint32_t reg, uint32_t value) 
 {
-    volatile uint32_t* addr = (volatile uint32_t*)(APIC_BASE_ADDRESS + reg);
+    volatile uint32_t* addr = (volatile uint32_t*)(apic_base + reg);
     *addr = value;
     asm volatile("" : : : "memory");  // Memory barrier
 }
@@ -40,7 +42,7 @@ void write_apic(uint32_t reg, uint32_t value)
 // Read from an APIC register
 uint32_t read_apic(uint32_t reg) 
 {
-    volatile uint32_t* addr = (volatile uint32_t*)(APIC_BASE_ADDRESS + reg);
+    volatile uint32_t* addr = (volatile uint32_t*)(apic_base + reg);
     return *addr;
 }
 
@@ -80,5 +82,11 @@ void setup_apic_timer(uint32_t interval)
 
 void init_apic() 
 {
+    apic_base = (uintptr_t)map_page_table(0xFEE00000);
     enable_apic(); // Enable the APIC
+}
+
+uintptr_t get_apic_virtual_base()
+{
+    return apic_base;
 }

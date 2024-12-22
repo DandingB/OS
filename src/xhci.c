@@ -3,8 +3,9 @@
 #include "xhci.h"
 #include "memory.h"
 #include "i686/x86.h"
+#include "i686/paging.h"
 
-uint32_t xhci_base = 0;
+uintptr_t xhci_base = 0;
 
 XHCI_REG_CAP* cap;		// Capability registers
 XHCI_REG_OP* op;		// Operational registers
@@ -38,6 +39,8 @@ void init_xhci()
 		{
 			xhci_base = get_xhci_base_address(0, device, 0);
 
+			xhci_base = map_page_table(xhci_base);
+
 			//if (!pci_set_msix(0, device, 0, 0xFEE00000, 0x41))
 			//	print("Failed to setup MSI-X!", 2);
 
@@ -58,7 +61,7 @@ void init_xhci()
 
 		uint8_t maxSlots = cap->HCSPARAMS1 & 0xFF; // Max 256
 		uint8_t maxERST = (cap->HCSPARAMS2 >> 4) & 0b1111;
-		uint8_t contextSize = (cap->HCCPARAMS1 >> 2) & 1;	// 0 = 32 bit contexts, 1 = 64 bit contexts
+		uint8_t contextSize = (cap->HCCPARAMS1 >> 2) & 1;	// 0 = 32 byte contexts, 1 = 64 byte contexts
 
 		command_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16);
 		event_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16 * 2);
@@ -152,7 +155,7 @@ void xhci_reset_ports()
 void xhci_claim_ownership()
 {
 	// Claim ownership
-	uint32_t xecp = xhci_base + (((cap->HCCPARAMS1 >> 16) & 0xFFFF) << 2);
+	uintptr_t xecp = xhci_base + (((cap->HCCPARAMS1 >> 16) & 0xFFFF) << 2);
 	while (1)
 	{
 		uint32_t* cap = (uint32_t*)xecp;

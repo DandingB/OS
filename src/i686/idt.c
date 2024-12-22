@@ -43,14 +43,6 @@ void interrupt_handler(uint32_t interrupt, uint32_t error)
 			outb(PIC_2_CTRL, PIC_CMD_END_OF_INTERRUPT);
 		outb(PIC_1_CTRL, PIC_CMD_END_OF_INTERRUPT);
 
-		//if (interrupt < 0x28) {
-		//	outb(PIC_1_CTRL, PIC_CMD_END_OF_INTERRUPT);
-		//}
-		//else {
-		//	outb(PIC_2_CTRL, PIC_CMD_END_OF_INTERRUPT);
-		//}
-		
-
 		apic_send_eoi();
 	}
 	else
@@ -65,11 +57,13 @@ void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags)
 {
 	idt_entry_t* descriptor = &idt[vector];
 
-	descriptor->isr_low = (uint32_t)isr & 0xFFFF;
+	descriptor->isr_low = (uintptr_t)isr;
 	descriptor->kernel_cs = 0x08; // this value can be whatever offset your kernel interrupt selector is in your GDT
+	descriptor->ist = 0;
 	descriptor->attributes = flags;
-	descriptor->isr_high = (uint32_t)isr >> 16;
-	descriptor->reserved = 0;
+	descriptor->isr_mid = (uintptr_t)isr >> 16;
+	descriptor->isr_high = (uintptr_t)isr >> 32;
+	descriptor->rsvd = 0;
 }
 
 void init_idt() 

@@ -21,10 +21,8 @@
 
 typedef volatile struct tagHBA_PORT 
 {
-	uint32_t clb;		 // 0x00, command list base address, 1K-byte aligned
-	uint32_t clbu;		 // 0x04, command list base address upper 32 bits
-	uint32_t fb;         // 0x08, FIS base address, 256-byte aligned
-	uint32_t fbu;        // 0x0C, FIS base address upper 32 bits
+	uint64_t clb;		 // 0x00, command list base address, 1K-byte aligned
+	uint64_t fb;         // 0x08, FIS base address, 256-byte aligned
 	uint32_t is;         // 0x10, interrupt status
 	uint32_t ie;         // 0x14, interrupt enable
 	uint32_t cmd;        // 0x18, command and status
@@ -90,8 +88,7 @@ typedef struct tagHBA_CMD_HEADER
 	uint32_t prdbc;		// Physical region descriptor byte count transferred
 
 	// DW2, 3
-	uint32_t ctba;		// Command table descriptor base address
-	uint32_t ctbau;		// Command table descriptor base address upper 32 bits
+	uint64_t ctba;		// Command table descriptor base address
 
 	// DW4 - 7
 	uint32_t rsv1[4];	// Reserved
@@ -100,8 +97,7 @@ typedef struct tagHBA_CMD_HEADER
 
 typedef struct tagHBA_PRDT_ENTRY
 {
-	uint32_t dba;		// Data base address
-	uint32_t dbau;		// Data base address upper 32 bits
+	uint64_t dba;		// Data base address
 	uint32_t rsv0;		// Reserved
 
 	// DW3

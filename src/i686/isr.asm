@@ -1,20 +1,20 @@
-[bits 32]
+[bits 64]
 
 	%macro isr_err_stub 1
 	isr_stub_%+%1:
-		push %1             ; push interrupt number
+		mov rdi, %1			; Move interrupt number into rdi
+		mov rsi, [esp]		; Move error code into rsi
 		call interrupt_handler
 		add esp, 4			; "remove" pushed value
-		iretd
+		iretq				; iretq is the  64-bit version of iretd
 	%endmacro
-	; if writing for 64-bit, use iretq instead
 	%macro isr_no_err_stub 1
 	isr_stub_%+%1:
-		push 0              ; push dummy error code
-		push %1             ; push interrupt number
+		mov rdi, %1			; Move interrupt number into rdi
+		mov rsi, 0		; Move dummy error code into rsi
+		mov rdi, %1
 		call interrupt_handler
-		add esp, 8			; "remove" pushed values
-		iretd
+		iretq
 	%endmacro
 
 
@@ -99,6 +99,6 @@
 	isr_stub_table:
 	%assign i 0 
 	%rep    72 
-		dd isr_stub_%+i ; use DQ instead if targeting 64-bit
+		dq isr_stub_%+i ; use DQ instead if targeting 64-bit
 	%assign i i+1 
 	%endrep

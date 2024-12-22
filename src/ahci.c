@@ -2,6 +2,8 @@
 #include "pci.h"
 #include "stdio.h"
 #include "i686/x86.h"
+#include "i686/apic.h"
+#include "i686/paging.h"
 
 #define	AHCI_BASE 0x400000	// 4M
 
@@ -18,11 +20,12 @@ HBA_MEM* init_ahci()
 		uint8_t subclass = pci_get_subclass_id(0, device, 0);
 		if (class == PCI_CLASS_MASSSTORAGE && subclass == PCI_SUBCLASS_SATA) // We found a PCI device which is a Mass storage and SATA controller
 		{
-			uint32_t ahci_base = pci_config_read(0, device, 0, 0x24); // Get the ABAR (BAR5)
-			if (!pci_set_msi(0, device, 0, 0xFEE00000, 0x40))
-				print("no msi found", 10);
+			uintptr_t ahci_base = pci_config_read(0, device, 0, 0x24); // Get the ABAR (BAR5)
+			//if (!pci_set_msi(0, device, 0, 0xFEE00000, 0x40))
+			//	print("no msi found", 10);
 
-			hba = (HBA_MEM*)ahci_base;
+			print_hexdump(&ahci_base, 8, 20);
+			hba = (HBA_MEM*)map_page_table(ahci_base);
 		}
 	}
 
@@ -63,13 +66,11 @@ void port_rebase(HBA_PORT* port, int portno)
 	// Command list entry maxim count = 32
 	// Command list maxim size = 32*32 = 1K per port
 	port->clb = AHCI_BASE + (portno << 10);
-	port->clbu = 0;
 	memset((void*)(port->clb), 0, 1024);
 
 	// FIS offset: 32K+256*portno
 	// FIS entry size = 256 bytes per port
 	port->fb = AHCI_BASE + (32 << 10) + (portno << 8);
-	port->fbu = 0;
 	memset((void*)(port->fb), 0, 256);
 
 	// Command table offset: 40K + 8K*portno
@@ -81,7 +82,6 @@ void port_rebase(HBA_PORT* port, int portno)
 		// 256 bytes per command table, 64+16+48+16*8
 		// Command table offset: 40K + 8K*portno + cmdheader_index*256
 		cmdheader[i].ctba = AHCI_BASE + (40 << 10) + (portno << 13) + (i << 8);
-		cmdheader[i].ctbau = 0;
 		memset((void*)cmdheader[i].ctba, 0, 256);
 	}
 
@@ -132,7 +132,7 @@ void write(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 	// Set up command table entry
 	HBA_CMD_TBL* cmdtbl = (HBA_CMD_TBL*)(cmdheader->ctba);
 	memset(cmdtbl, 0, sizeof(HBA_CMD_TBL));
-	cmdtbl->prdt_entry[0].dba = (uint32_t)(data); // Buffer address
+	cmdtbl->prdt_entry[0].dba = (uintptr_t)(data); // Buffer address
 	cmdtbl->prdt_entry[0].dbc = n_sectors * 512 - 1; // Byte count, should be one less than the actual number (important)
 	cmdtbl->prdt_entry[0].i = 1; // Interrupt on completion
 
@@ -190,7 +190,7 @@ void read(HBA_PORT* port, void* data, uint64_t lba, uint16_t n_sectors)
 	// Set up command table entry
 	HBA_CMD_TBL* cmdtbl = (HBA_CMD_TBL*)(cmdheader->ctba);
 	memset(cmdtbl, 0, sizeof(HBA_CMD_TBL));
-	cmdtbl->prdt_entry[0].dba = (uint32_t)(data); // Buffer address
+	cmdtbl->prdt_entry[0].dba = (uintptr_t)(data); // Buffer address
 	cmdtbl->prdt_entry[0].dbc = n_sectors * 512 - 1; // Byte count, should be one less than the actual number (important)
 	cmdtbl->prdt_entry[0].i = 1; // Interrupt on completion
 

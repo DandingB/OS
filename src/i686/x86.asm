@@ -1,4 +1,4 @@
-[bits 32]
+[bits 64]
 [global outb]
 [global inb]
 [global outl]
@@ -9,40 +9,40 @@
 section .text
 
 	outb:
-		mov dx, [esp + 4]
-		mov al, [esp + 8]
+		mov dx, di		; Move port into dx
+		mov al, sil		; Move value into al
 		out dx, al
 		ret
 
 	inb:
-		mov dx, [esp + 4]
-		xor eax, eax
+		mov dx, di		; Move port into dx
+		xor rax, rax	; Clear rax
 		in al, dx
 		ret
 
 	outl:
-		mov dx, [esp + 4]    ; Move the lower 16 bits of ebx (port number) into dx
-		mov eax, [esp + 8]  ; Move the value to be written into eax
+		mov dx, di    ; Move the lower 16 bits of ebx (port number) into dx
+		mov eax, esi  ; Move the value to be written into eax
 		out dx, eax   ; Write the value to the port
 		ret
 
 	inl:
-		mov dx, [esp + 4]    ; Move the lower 16 bits of ebx (port number) into dx
+		mov dx, di    ; Move the lower 16 bits of ebx (port number) into dx
 		in eax, dx    ; Read a 32-bit value from the port into eax
 		ret
 
 
 	memset:      
-		push    edi             ; proc uses edi, so save it.
+		push rdi            ; proc uses rdi, so save it.
 
-		mov     ecx, [esp + 16] ; size_t num
-		mov     al, [esp + 12]  ; int value 
-		mov     edi, [esp + 8]  ; void * ptr
-		rep     stosb 
+		mov rcx, rdx		; size_t num
+		mov al,  sil		; int value 
+		mov rdi, rdi		; void * ptr
+		rep stosb 
 
-		mov     eax, [esp + 8]  ; return pointer
-		pop     edi             ; restore edi
-		ret                     ; let caller adjust stack
+		mov rax, rdi  ; return pointer
+		pop rdi             ; restore rdi
+		ret
 
 
 	reboot:

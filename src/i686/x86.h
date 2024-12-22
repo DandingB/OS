@@ -1,17 +1,15 @@
 #pragma once
 #include <stdint.h>
 
-#define CDECL __attribute__((cdecl))
+void outb(uint16_t port, uint8_t value);
+uint8_t inb(uint16_t port);
 
-void CDECL outb(uint16_t port, uint8_t value);
-uint8_t CDECL inb(uint16_t port);
+void outl(uint32_t port, uint32_t value);
+uint32_t inl(uint32_t port);
 
-void CDECL outl(uint32_t port, uint32_t value);
-uint32_t CDECL inl(uint32_t port);
+void* memset(void* dest, uint8_t val, uint32_t size);
 
-void* CDECL memset(void* dest, uint8_t val, uint32_t size);
-
-void CDECL reboot();
+void reboot();
 
 
 

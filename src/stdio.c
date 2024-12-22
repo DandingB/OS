@@ -131,7 +131,7 @@ void print_int(int num)
 
 void print_hexdump(volatile void* loc, int size, unsigned int line) {
 
-	char* vidmem = (char*)(0xB8000 + (line * 80 * 2));
+	char* vidmem = (char*)(0xB8000UL + (line * 80 * 2));
 	const char hex_chars[] = "0123456789ABCDEF";
 
 	// Write "0x" to the video memory
@@ -156,7 +156,7 @@ void print_hexdump(volatile void* loc, int size, unsigned int line) {
 
 void print_hexdump_volatile(volatile uint32_t* loc, unsigned int line) 
 {
-    char* vidmem = (char*)(0xB8000 + (line * 80 * 2));
+    char* vidmem = (char*)(0xB8000UL + (line * 80 * 2));
     const char hex_chars[] = "0123456789ABCDEF";
 
     *vidmem++ = '0';

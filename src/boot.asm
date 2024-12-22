@@ -1,85 +1,108 @@
 [bits 16]
 
-KERNEL_LOCATION equ 0x7e00
-
-section .entry
-
 extern __bss_start
 extern __end
 
+section .entry
+
+%define PAGE_PRESENT    (1 << 0)
+%define PAGE_WRITE      (1 << 1)
+
+KERNEL_LOCATION equ 0x7E00
+CODE_SEG equ GDT_code - GDT ; 8
+DATA_SEG equ GDT_data - GDT ; 16
+
 global entry
-
 entry:
-
-; Save the booting disk
-mov [BOOT_DISK], dl
-
-mov ax, 0 ; Set segments to 0
-mov ds, ax
-mov es, ax
-mov bp, 0x7000
-mov sp, bp
-
-;Enable A-20
-call enable_A20
-
-; Copy the code from sector 2 to memory location 0x7e00
-mov bx, KERNEL_LOCATION
-mov dh, 32
-
-mov ah, 0x02 ; Mode: read sectors from drive
-mov al, dh   ; Sectors to read count
-mov ch, 0x00 ; Cylinder
-mov dh, 0x00 ; Head
-mov cl, 0x02 ; Sector
-mov dl, dl ; Drive
-int 0x13            ; TODO: no error management!
-
-;mov ah, 0x0E
-;mov al, 'G'
-;int 0x10
-
-; Setup protected mode
-cli
-lgdt [GDT_descriptor]
-mov eax, cr0
-or eax, 1
-mov cr0, eax
-
-
-jmp CODE_SEG:start_protected_mode  ; Make far jump, to flush the pipeline
-jmp $
-
-
-[bits 32]
-start_protected_mode:
-
-    mov ax, DATA_SEG        ; 16 = index of data segment ,  which has the base 0
+    mov ax, 0 ; Set segments to 0
     mov ds, ax
     mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov ss, ax 
-    mov ebp, 0x7000	    ; Update our stack position so it is right
-    mov esp, ebp            ; at the top of the free space.
+    mov bp, 0x7000
+    mov sp, bp
 
-    mov edi, __bss_start
-    mov ecx, __end
-    sub ecx, edi
-    mov al, 0
+    mov [BOOT_DISK], dl
+
+    ; Load kernel code
+    mov bx, KERNEL_LOCATION ; Load address
+    mov dh, 128    ; Sectors to read count
+    mov ah, 0x02 ; Mode: read sectors from drive
+    mov al, dh   ; Sectors to read count
+    mov ch, 0x00 ; Cylinder
+    mov dh, 0x00 ; Head
+    mov cl, 0x02 ; Sector
+    mov dl, dl   ; Drive
+    int 0x13            ; TODO: no error management!
+
+    ;Enable A-20
+    call enable_A20
+
+    mov di, 0x1000  ; Page table address
+
+    ; Zero out the 16KiB buffer.
+    push di         ; REP STOSD alters DI.
+    mov ecx, 0x1000 ; Number of times
+    xor eax, eax
     cld
-    rep stosb
+    rep stosd
+    pop di
 
-    ; Push bootDrive parameter on the stack
-    xor edx, edx
-    mov dl, [BOOT_DISK]
-    push edx
+    ; Build paging structures. These are only temporary and should be overwritten by the kernel asap.
+    ; Build Page Map Table level 4
+    lea eax, [es:di + 0x1000]
+    or eax, PAGE_PRESENT | PAGE_WRITE 
+    mov [es:di], eax
 
-    extern kmain
+    ; Build the Page Directory Pointer Table.
+    lea eax, [es:di + 0x2000]
+    or eax, PAGE_PRESENT | PAGE_WRITE
+    mov [es:di + 0x1000], eax
 
-    call kmain
+    ; Build the Page Directory.
+    lea eax, [es:di + 0x3000]
+    or eax, PAGE_PRESENT | PAGE_WRITE
+    mov [es:di + 0x2000], eax
+    
+    push di
+    mov eax, PAGE_PRESENT | PAGE_WRITE
+
+    ; Build the Page Table.
+.LoopPageTable:
+    mov [es:di + 0x3000], eax
+    add eax, 0x1000
+    add di, 8
+    cmp eax, 0x200000
+    jb .LoopPageTable
+
+    pop di
+    
+    
+    ; Enable PAE and PGE
+    mov eax, cr4
+    or eax, 0b10100000
+    mov cr4, eax
+
+    ; Set LME
+    mov ecx, 0xC0000080
+    rdmsr
+    or eax, 0x00000100
+    wrmsr
+
+    ; Set address of PML4
+    lea edx, [es:di]
+    mov cr3, edx
+
+    ; Enable paging and protected mode
+    mov ebx, cr0
+    or ebx,0x80000001
+    mov cr0, ebx                    
+
+    ; Disable interrupts and Load GDT descriptor
+    cli
+    lgdt [GDT_descriptor]
+
+     ; Load CS with 64 bit segment and flush the instruction cache
+    jmp CODE_SEG:LongMode
     jmp $
-
 
 enable_A20:
     cli
@@ -127,30 +150,56 @@ a20wait2:
 
 
 
-BOOT_DISK: db 0
-
-; Some defines
-CODE_SEG equ GDT_code - GDT_start ; 8
-DATA_SEG equ GDT_data - GDT_start ; 16
 
 
+[bits 64]      
+LongMode:
+    mov ax, DATA_SEG
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+    mov ebp, 0x7000	    ; Update our stack position so it is right
+    mov esp, ebp        ; at the top of the free space.
+
+    ; Clear bss section (uninitialized static variables) to zeroes
+    mov edi, __bss_start
+    mov ecx, __end
+    sub ecx, edi
+    mov eax, 0
+    cld
+    rep stosb ; rep: ecx = number of times, stosb: edi = start location
+
+    ; Push boot disk parameter on the stack
+    xor rdi, rdi
+    mov dl, [BOOT_DISK]
+
+    extern kernel_main
+    call kernel_main
+    jmp $
+
+
+
+
+; Global Descriptor Table  ; Padding to make the "address of the GDT" field aligned on a 4-byte boundary
+ALIGN 4 
 GDT_descriptor:
-    dw GDT_end - GDT_start - 1
-    dd GDT_start
+    dw GDT_end - GDT - 1
+    dd GDT
 
-
-GDT_start:
+GDT:
     GDT_null:
-        dd 0x0
-        dd 0x0
+        dq 0x0000000000000000             ; Null Descriptor - should be present.
 
-    GDT_code:
+    GDT_code:    
         dw 0xffff       ;Limit 0-15
         dw 0x0000       ;Base 0-15
         db 0x00         ;Base 16-23
         db 0b10011010   ;Access byte
-        db 0b11001111   ;Flags, Limit 16-19
+        db 0b00101111   ;Flags (set 64-bit code), Limit 16-19  
         db 0x00         ;Base 24-31
+
 
     GDT_data:
         dw 0xffff
@@ -159,10 +208,11 @@ GDT_start:
         db 0b10010010
         db 0b11001111
         db 0x00
-
+      
 GDT_end:
 
+BOOT_DISK: db 0
 
 
 times 510-($-$$) db 0              
-dw 0xaa55
+dw 0xAA55
