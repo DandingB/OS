@@ -24,7 +24,7 @@ HBA_MEM* init_ahci()
 			//if (!pci_set_msi(0, device, 0, 0xFEE00000, 0x40))
 			//	print("no msi found", 10);
 
-			print_hexdump(&ahci_base, 8, 20);
+			//print_hexdump(&ahci_base, 8, 20);
 			hba = (HBA_MEM*)map_page_table(ahci_base);
 		}
 	}

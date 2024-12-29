@@ -5,10 +5,9 @@ extern tmp_rsp
 	%macro isr_err_stub 1
 	isr_stub_%+%1:
 		mov rdi, %1			; Move interrupt number into rdi
-		mov rsi, [esp]		; Move error code into rsi
+		mov rsi, [rsp]		; Move error code into rsi
 		call interrupt_handler
-		add esp, 4			; "remove" pushed value
-		iretq				; iretq is the  64-bit version of iretd
+		iretq				; iretq is the 64-bit version of iretd
 	%endmacro
 	%macro isr_no_err_stub 1
 	isr_stub_%+%1:

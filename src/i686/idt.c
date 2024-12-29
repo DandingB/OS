@@ -49,7 +49,8 @@ void interrupt_handler(uint32_t interrupt, uint32_t error)
 	{
 		print("Exception!", 1);
 		print_hexdump(&interrupt, 1, 2);
-		__asm__ volatile ("cli; hlt"); // Completely hangs the computer
+		print_hexdump(&error, 4, 3);
+		asm volatile ("cli; hlt"); // Completely hangs the computer
 	}
 }
 

@@ -24,7 +24,7 @@ entry:
 
     ; Load kernel code
     mov bx, KERNEL_LOCATION ; Load address
-    mov dh, 128    ; Sectors to read count
+    mov dh, 128  ; Sectors to read count
     mov ah, 0x02 ; Mode: read sectors from drive
     mov al, dh   ; Sectors to read count
     mov ch, 0x00 ; Cylinder
@@ -163,6 +163,10 @@ LongMode:
     mov ebp, 0x7000	    ; Update our stack position so it is right
     mov esp, ebp        ; at the top of the free space.
 
+    ; Set TSS
+    mov ax, (5 * 8) | 0 ; fifth 8-byte selector, symbolically OR-ed with 0 to set the RPL (requested privilege level).
+	ltr ax
+
     ; Clear bss section (uninitialized static variables) to zeroes
     mov edi, __bss_start
     mov ecx, __end
@@ -196,7 +200,7 @@ GDT:
         dw 0xffff       ;Limit 0-15
         dw 0x0000       ;Base 0-15
         db 0x00         ;Base 16-23
-        db 0b10011010   ;Access byte
+        db 0b10011010   ;Access byte (DPL level 0)
         db 0b00101111   ;Flags (set 64-bit code), Limit 16-19  
         db 0x00         ;Base 24-31
 
@@ -208,14 +212,6 @@ GDT:
         db 0b11001111
         db 0x00
 
-    GDT_code_user:    
-        dw 0xffff       ;Limit 0-15
-        dw 0x0000       ;Base 0-15
-        db 0x00         ;Base 16-23
-        db 0b11111010   ;Access byte
-        db 0b00101111   ;Flags (set 64-bit code), Limit 16-19  
-        db 0x00         ;Base 24-31
-
     GDT_data_user:
         dw 0xffff
         dw 0x0000
@@ -223,8 +219,43 @@ GDT:
         db 0b11110010
         db 0b11001111
         db 0x00
-      
+
+    GDT_code_user:    
+        dw 0xffff       ;Limit 0-15
+        dw 0x0000       ;Base 0-15
+        db 0x00         ;Base 16-23
+        db 0b11111010   ;Access byte (DPL level 3)
+        db 0b00101111   ;Flags (set 64-bit code), Limit 16-19  
+        db 0x00         ;Base 24-31
+
+
+    GDT_TSS:    
+        dw 0x0068        ;Limit 0-15 (Sizeof TSS)
+        dw TSS           ;Base 0-15
+        db 0x00          ;Base 16-23
+        db 0b10001001    ;Access byte
+        db 0b00100000    ;Flags (set 64-bit code), Limit 16-19  
+        db 0x00          ;Base 24-31
+        dd 0x00000000   
+        dd 0x00000000   
 GDT_end:
+
+TSS:
+    dd 0x00000000
+    dq 0x0000000000070000 ; RSP0
+    dq 0x0000000000000000 ; RSP1
+    dq 0x0000000000000000 ; RSP2
+    dq 0x0000000000000000 ; rsvd
+    dq 0x0000000000000000 ; IST1
+    dq 0x0000000000000000 ; IST2
+    dq 0x0000000000000000 ; IST3
+    dq 0x0000000000000000 ; IST4
+    dq 0x0000000000000000 ; IST5
+    dq 0x0000000000000000 ; IST6
+    dq 0x0000000000000000 ; IST7
+    dq 0x0000000000000000 ; rsvd
+    dd 0x00000000
+TSS_end:
 
 BOOT_DISK: db 0
 

@@ -22,6 +22,6 @@ x86_64-elf-gcc -ffreestanding -nostdlib -c -O0 "src\i686\idt.c" -o "bin\idt.obj"
 x86_64-elf-gcc -ffreestanding -nostdlib -c -O0 "src\i686\pic.c" -o "bin\pic.obj"
 x86_64-elf-gcc -ffreestanding -nostdlib -c -O0 "src\i686\apic.c" -o "bin\apic.obj"
 
-x86_64-elf-ld -T linker.ld -nostdlib "bin\boot.obj" "bin\x86.obj" "bin\kernel.obj" "bin\stdio.obj" "bin\memory.obj" "bin\stdlib.obj" "bin\pci.obj" "bin\ahci.obj" "bin\xhci.obj" "bin\paging.obj" "bin\idt.obj" "bin\isr.obj" "bin\pic.obj" "bin\apic.obj" -o "bin\OS.bin" --oformat binary
+x86_64-elf-ld -T linker.ld -nostdlib "bin\boot.obj" "bin\x86.obj" "bin\kernel.obj" "bin\stdio.obj" "bin\memory.obj" "bin\stdlib.obj" "bin\pci.obj" "bin\ahci.obj" "bin\xhci.obj" "bin\paging.obj" "bin\idt.obj" "bin\isr.obj" "bin\pic.obj" "bin\apic.obj" -o "bin\kernel_x86_64.bin" --oformat binary
 
 pause

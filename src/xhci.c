@@ -86,13 +86,16 @@ void init_xhci()
 
 		xhci_reset_ports();
 
+		while (!(op->PORTS[3].PORTSC & PORTSC_CCS));
+
 		// USB 1.0 and 2.0 need to be restarted to be enabled (PED)
 		op->PORTS[2].PORTSC |= PORTSC_PR; // Mouse 
 		op->PORTS[3].PORTSC |= PORTSC_PR; // Keyboard
 
-		if (op->PORTS[3].PORTSC & PORTSC_CCS)
-			while (!(op->PORTS[3].PORTSC & PORTSC_PED));
+		//if (op->PORTS[3].PORTSC & PORTSC_CCS)
+		while (!(op->PORTS[3].PORTSC & PORTSC_PED));
 
+		for (int i = 0; i < 0xFFFFFFF; i++);
 
 		// When receiving an interrupt:
 		// 1) Clear the Status register bit
@@ -100,26 +103,30 @@ void init_xhci()
 		// 3) Process the TD(s)
 		// 4) Update the Dequeue Pointer to point to the last TD processed, clearing the EHB bit at the same time
 
+		
+		xhci_setup_device(4);
 
-		 xhci_setup_device(5);
 
-		 print_hexdump(&event_ring[0].status, 4, 4);
-		 print_hexdump(&event_ring[1].status, 4, 5);
-		 print_hexdump(&event_ring[2].status, 4, 6);
-		 print_hexdump(&event_ring[3].status, 4, 7);
-		 print_hexdump(&event_ring[4].status, 4, 8);
-		 print_hexdump(&event_ring[5].status, 4, 9);
-		 print_hexdump(&event_ring[6].status, 4, 10);
-		 print_hexdump(&event_ring[7].status, 4, 11);
-		 print_hexdump(&event_ring[8].status, 4, 12);
-		 print_hexdump(&event_ring[9].status, 4, 13);
-		 print_hexdump(&event_ring[10].status, 4, 14);
-		 print_hexdump(&event_ring[11].status, 4, 15);
-		 print_hexdump(&event_ring[12].status, 4, 16);
-		 print_hexdump(&event_ring[13].status, 4, 17);
-		 print_hexdump(&event_ring[14].status, 4, 18);
-		 print_hexdump(&event_ring[15].status, 4, 19);
 
+		//while (1)
+		//{
+		//	print_hexdump(&event_ring[0].status, 8, 4);
+		//	print_hexdump(&event_ring[1].status, 8, 5);
+		//	print_hexdump(&event_ring[2].status, 8, 6);
+		//	print_hexdump(&event_ring[3].status, 8, 7);
+		//	print_hexdump(&event_ring[4].status, 8, 8);
+		//	print_hexdump(&event_ring[5].status, 8, 9);
+		//	print_hexdump(&event_ring[6].status, 8, 10);
+		//	print_hexdump(&event_ring[7].status, 8, 11);
+		//	print_hexdump(&event_ring[8].status, 8, 12);
+		//	print_hexdump(&event_ring[9].status, 8, 13);
+		//	print_hexdump(&event_ring[10].status, 8, 14);
+		//	print_hexdump(&event_ring[11].status, 8, 15);
+		//	print_hexdump(&event_ring[12].status, 8, 16);
+		//	print_hexdump(&event_ring[13].status, 8, 17);
+		//	print_hexdump(&event_ring[14].status, 8, 18);
+		//	print_hexdump(&event_ring[15].status, 8, 19);
+		//}
 
 	}
 }
@@ -128,9 +135,7 @@ void xhci_reset_hc()
 {
 	// Reset the Host Controller & Wait...
 	op->USBCMD |= USBCMD_HCRST;
-	//print("HC Resetting", 3); // TODO: Maybe a memory barrier here
-	while (op->USBCMD & USBCMD_HCRST);
-	//print("               ", 3);
+	while (op->USBCMD & USBCMD_HCRST && !(op->USBSTS & USBSTS_CNR));
 }
 
 void xhci_reset_ports()
@@ -142,13 +147,7 @@ void xhci_reset_ports()
 		op->PORTS[i].PORTSC |= PORTSC_PR;
 	}
 
-	for (int i = 0; i < 0xFFFF; i++);
-
-	for (uint8_t i = 0; i < maxPorts; i++)
-	{
-		uint32_t test = op->PORTS[i].PORTSC;
-		print_hexdump(&test, 4, 4 + i);
-	}
+	//for (int i = 0; i < 0xFFFF; i++);
 }
 
 void xhci_claim_ownership()
@@ -219,6 +218,8 @@ void xhci_setup_device(uint8_t port)
 	trb.control = TRB_SET_TYPE(ENABLE_SLOT);
 	XHCI_TRB event1 = xhci_do_command(trb);
 
+	//print_hexdump(&event1.status, 8, 21);
+
 	// Alloc memory for Device Context
 	XHCI_CONTEXT* dc = (XHCI_CONTEXT*)malloc_aligned(64, sizeof(XHCI_CONTEXT) * 32);
 	memset(dc, 0, sizeof(XHCI_CONTEXT) * 32);
@@ -229,6 +230,8 @@ void xhci_setup_device(uint8_t port)
 
 	XHCI_TRB* transfer_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16);
 	XHCI_TRB* transfer_ring_1 = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16);
+	memset(transfer_ring, 0, sizeof(XHCI_TRB) * 16);
+	memset(transfer_ring_1, 0, sizeof(XHCI_TRB) * 16);
 
 	// Construct Input Context
 	XHCI_CONTEXT* inputContext = (XHCI_CONTEXT*)malloc_aligned(64, sizeof(XHCI_CONTEXT) * 33);
@@ -237,10 +240,10 @@ void xhci_setup_device(uint8_t port)
 	inputContext[0].data[1] = 0b011; 		 									
 	// Slot Context
 	inputContext[1].data[0] = SLOT_SET_CONTEXTENTRIES(1) | SLOT_SET_SPEED(speed) | SLOT_SET_ROUTE(0); 	
-	inputContext[1].data[1] = SLOT_SET_ROOTPORT(port);
+	inputContext[1].data[1] = SLOT_SET_ROOTPORT(port) | SLOT_SET_MAXEXITLATENCY(0); // Max Exit Latency = 500 is a Parameter Error
 	// Endpoint Context
-	inputContext[2].data[0] = (0 << 16) | (0 << 10) | (0 << 8);				// Interval , MaxPStreams , Mult
-	inputContext[2].data[1] = (64 << 16) | (0 << 8) | (4 << 3) | (3 << 1);	// MaxPacketSize , MaxBurstSize , EPType , CErr // TODO: MaxPacketSize should be selected from device speed
+	inputContext[2].data[0] = (0 << 16) | (0 << 10) | (0 << 8) | (0);				// Interval , MaxPStreams , Mult
+	inputContext[2].data[1] = (8 << 16) | (0 << 8) | (4 << 3) | (3 << 1);	// MaxPacketSize , MaxBurstSize , EPType , CErr // TODO: MaxPacketSize should be selected from device speed
 	inputContext[2].data[2] = ((uintptr_t)transfer_ring) | (1 << 0);		// TRDequeuePointer , DCS
 	inputContext[2].data[4] = (32 << 0);									// AverageTRBLength
 
@@ -251,9 +254,11 @@ void xhci_setup_device(uint8_t port)
 	trb2.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(ADDRESS_DEVICE) | TRB_SET_BSR(0);
 	XHCI_TRB event2 = xhci_do_command(trb2);
 
+	//print_hexdump(&event2.status, 8, 22);
+
 	// Get Device Descriptor
 	USB_DEVICE_DESCRIPTOR descriptor;
-	xhci_get_descriptor(slot, transfer_ring, 16, &descriptor);
+	xhci_get_descriptor(slot, transfer_ring, 1, 8, &descriptor);
 
 	// Update input context with correct MaxPacketSize
 	inputContext[0].data[1] = 0b010;
@@ -290,11 +295,7 @@ void xhci_setup_device(uint8_t port)
 
 	xhci_set_configuration(slot, transfer_ring);
 
-
-	XHCI_CONTEXT* deviceContext = (XHCI_CONTEXT*)dcbaa[1];
-	print_hexdump(&deviceContext[1].data[1], 4, 22);
-
-	print_hexdump(&descriptor, 16, 23);
+	print_hexdump(&descriptor, 8, 23);
 
 }
 
@@ -309,10 +310,10 @@ XHCI_TRB xhci_do_command(XHCI_TRB trb)
 	return *xhci_dequeue_event(COMMAND_COMP_EVENT);
 }
 
-XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t length, volatile void* buffer)
+XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t type, uint8_t length, volatile void* buffer)
 {
 	XHCI_TRB setup;
-	setup.address = TRB_SET_wLength(length) | TRB_SET_wIndex(0) | TRB_SET_wValue(0x0100) | TRB_SET_bRequest(6) | TRB_SET_bmRequestType(0x80);
+	setup.address = TRB_SET_wLength(length) | TRB_SET_wIndex(0) | TRB_SET_wValue(USB_DESC_TYPE(type) | USB_DESC_INDEX(0)) | TRB_SET_bRequest(6) | TRB_SET_bmRequestType(0x80);
 	setup.status = TRB_SET_INT_TARGET(0) | TRB_SET_TRANSFER_LENGTH(8);
 	setup.control = TRB_SET_TT(IN_DATA) | TRB_SET_TYPE(SETUP_STAGE) | TRB_SET_IDT(1) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
 	xhci_queue_transfer(setup, transfer_ring);
@@ -336,6 +337,8 @@ XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t leng
 
 void xhci_set_configuration(uint8_t slot, XHCI_TRB* transfer_ring)
 {
+	for (int i = 0; i < 0xFFFFFF; i++);
+
 	XHCI_TRB setup;
 	setup.address = TRB_SET_wLength(0) | TRB_SET_wIndex(0) | TRB_SET_wValue(0x0001) | TRB_SET_bRequest(9) | TRB_SET_bmRequestType(0x00);
 	setup.status = TRB_SET_INT_TARGET(0) | TRB_SET_TRANSFER_LENGTH(8);
@@ -434,6 +437,9 @@ XHCI_TRB* xhci_dequeue_event(uint8_t trb_type)
 		next_event = event_ring;
 		bEventCycle = !bEventCycle;
 	}
+
+	//for (int i = 0; i < 0xFFFF; i++);
+
 
 	rts->IR[0].ERDP = (uintptr_t)next_event; // TODO: (Idea) do_command should not change the dequeue pointer. A interrupt handler should do that, but ignore Command Completion Events
 	return event;

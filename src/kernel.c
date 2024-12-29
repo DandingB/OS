@@ -21,8 +21,7 @@ char cli_temp[75];
 
 HBA_MEM* hba = 0;
 
-uint64_t tmp_rsp = 0;
-
+int bExe = 0;
 
 const char ASCIITable[] = {
 	 0 ,  0 , '1', '2',
@@ -52,8 +51,7 @@ void syscall_entry()
 
 	print("Syscall!", 10);
 
-	sysret(rip, flags, 0x00500000UL);
-	//__asm volatile("sysretq");
+	sysret(rip, flags, rsp);
 }
 
 void read_msr(uint32_t msr, uint32_t* lo, uint32_t* hi);
@@ -66,26 +64,29 @@ void kernel_entry(uint16_t bootDrive)
 	init_pic();
 	init_apic();
 
+	hba = init_ahci();
+
+	// Syscall: CS = IA32_STAR[47:32], SS = IA32_STAR[47:32] + 8
+	// Sysret: CS = IA32_STAR[63:48] + 16, SS = IA32_STAR[63:48] + 8
+	write_msr(0xC0000081, 0, 0x00100008);
+	write_msr(0xC0000082, (uintptr_t)syscall_entry, 0);
+	write_msr(0xC0000084, (1 << 9), 0); // Clear the IF flag
+
 	clear_screen();
 	print2(" BandidOS                                                         Esc to reboot ", 0, 0, BLACK_TXT);
 	setcursor(0, 3);
 
-	hba = init_ahci();
+	init_xhci();
 
-
-	write_msr(0xC0000081, 0, 0x00180008);
-	write_msr(0xC0000082, (uintptr_t)syscall_entry, 0);
-	write_msr(0xC0000084, (1 << 9), 0); // Clear the IF flag
-
-	//init_xhci();
 	//__asm("int $0x2");
-
-
-	//asm("mov %%rsp, %0" : "=r"(tmp_rsp) : );
-	load_program(100);
-
-
-	__asm("hlt");
+	while (1)
+	{
+		if (bExe)
+		{
+			load_program(100);
+			bExe = 0;
+		}
+	}
 }
 
 char translate(uint8_t scancode)
@@ -229,9 +230,8 @@ void process_cmd()
 		if (numArgs == 1)
 		{
 			uint32_t sector = atoi(args[0]);
-			load_program(sector);
-
-			print_hexdump((void*)0x00600000, 182, 5);
+			bExe = 1;
+			//print_hexdump((void*)0x00600000, 182, 5);
 		}
 	}
 
@@ -310,9 +310,11 @@ void start_process(uint32_t entry_point, uint32_t stack_top)
 void test()
 {
 	print("hellosa!", 15);
-	//asm volatile ("syscall");
-	print("hellosa 2! ", 7);
-	while (1);
+	asm volatile ("syscall");	
+	//while (1)
+	//{
+	//	print("User loop! ", 7);
+	//}
 }
 
 void load_program(uint64_t sector)

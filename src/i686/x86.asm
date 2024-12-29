@@ -80,6 +80,6 @@ section .text
 	sysret:
 		mov rcx, rdi
 		mov r11, rsi
-		;mov rsp, rdx
-		;mov rbp, rdx
+		mov rsp, rdx
+		mov rbp, rdx
 		o64 sysret	;sysretq

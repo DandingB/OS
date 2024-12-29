@@ -45,7 +45,7 @@
 
 #define TRB_SET_bmRequestType(type)     (type & 0xFF)
 #define TRB_SET_bRequest(req)           ((req & 0xFF) << 8)
-#define TRB_SET_wValue(value)           ((value & 0xFFFF) << 16)
+#define TRB_SET_wValue(value)           (((value) & 0xFFFF) << 16)
 #define TRB_SET_wIndex(index)           ((uint64_t)(index & 0xFFFF) << 32)
 #define TRB_SET_wLength(length)         ((uint64_t)(length & 0xFFFF) << 48)
 #define TRB_SET_TRANSFER_LENGTH(length) (length & 0x1FFFF)
@@ -61,9 +61,13 @@
 #define SLOT_SET_SPEED(speed)           ((speed & 0xF) << 20)   // This field indicates the speed of the device.
 #define SLOT_SET_MTT(mtt)               ((mtt & 0x1) << 25)     // Multi-TT
 #define SLOT_SET_HUB(hub)               ((hub & 0x1) << 26)     // This flag is set to '1' by software if this device is a USB hub, or '0' if it is a USB function. 
+#define SLOT_SET_MAXEXITLATENCY(l)      (l << 0)                // Max Exit Latency
 #define SLOT_SET_CONTEXTENTRIES(n)      (n << 27)               // Context entries
 #define SLOT_SET_ROOTPORT(port)         ((port & 0xFF) << 16)   // Root hub port number
 #define SLOT_SET_NPORTS(port)           ((port & 0xFF) << 16)   // Number of ports
+
+#define USB_DESC_INDEX(index)           ((index & 0xFF) << 0)   // Descriptor index, for use in wValue
+#define USB_DESC_TYPE(type)             ((type & 0xFF) << 8)   // Descriptor type, for use in wValue
 
 
 
@@ -177,7 +181,7 @@ void xhci_setup_device(uint8_t port);
 
 XHCI_TRB xhci_do_command(XHCI_TRB trb);
 
-XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t length, volatile void* buffer);
+XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t type, uint8_t length, volatile void* buffer);
 void xhci_set_configuration(uint8_t slot, XHCI_TRB* transfer_ring);
 
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb);
