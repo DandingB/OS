@@ -17,6 +17,7 @@
 #define ERDP_EHB        (1 << 3)    // Event Handler Busy
 
 // TRB Types
+#define NORMAL              1
 #define SETUP_STAGE         2
 #define DATA_STAGE          3
 #define STATUS_STAGE        4
@@ -185,7 +186,7 @@ XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t type
 void xhci_set_configuration(uint8_t slot, XHCI_TRB* transfer_ring);
 
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb);
-XHCI_TRB* xhci_queue_transfer(XHCI_TRB trb, XHCI_TRB* transfer_ring);
+XHCI_TRB* xhci_queue_transfer(XHCI_TRB trb, XHCI_TRB* transfer_ring, uint8_t* enqueue, uint8_t* cycle);
 XHCI_TRB* xhci_dequeue_event(uint8_t trb_type);
 
 uint32_t get_xhci_base_address(uint8_t bus, uint8_t device, uint8_t function);

@@ -86,16 +86,16 @@ void init_xhci()
 
 		xhci_reset_ports();
 
-		while (!(op->PORTS[3].PORTSC & PORTSC_CCS));
+		//while (!(op->PORTS[3].PORTSC & PORTSC_CCS));
 
-		// USB 1.0 and 2.0 need to be restarted to be enabled (PED)
-		op->PORTS[2].PORTSC |= PORTSC_PR; // Mouse 
-		op->PORTS[3].PORTSC |= PORTSC_PR; // Keyboard
+		//// USB 1.0 and 2.0 need to be restarted to be enabled (PED)
+		//op->PORTS[2].PORTSC |= PORTSC_PR; // Mouse 
+		//op->PORTS[3].PORTSC |= PORTSC_PR; // Keyboard
 
-		//if (op->PORTS[3].PORTSC & PORTSC_CCS)
-		while (!(op->PORTS[3].PORTSC & PORTSC_PED));
+		////if (op->PORTS[3].PORTSC & PORTSC_CCS)
+		//while (!(op->PORTS[3].PORTSC & PORTSC_PED));
 
-		for (int i = 0; i < 0xFFFFFFF; i++);
+		//for (int i = 0; i < 0xFFFFFFF; i++);
 
 		// When receiving an interrupt:
 		// 1) Clear the Status register bit
@@ -104,30 +104,29 @@ void init_xhci()
 		// 4) Update the Dequeue Pointer to point to the last TD processed, clearing the EHB bit at the same time
 
 		
-		xhci_setup_device(4);
+		xhci_setup_device(5);
 
 
 
 		//while (1)
-		//{
-		//	print_hexdump(&event_ring[0].status, 8, 4);
-		//	print_hexdump(&event_ring[1].status, 8, 5);
-		//	print_hexdump(&event_ring[2].status, 8, 6);
-		//	print_hexdump(&event_ring[3].status, 8, 7);
-		//	print_hexdump(&event_ring[4].status, 8, 8);
-		//	print_hexdump(&event_ring[5].status, 8, 9);
-		//	print_hexdump(&event_ring[6].status, 8, 10);
-		//	print_hexdump(&event_ring[7].status, 8, 11);
-		//	print_hexdump(&event_ring[8].status, 8, 12);
-		//	print_hexdump(&event_ring[9].status, 8, 13);
-		//	print_hexdump(&event_ring[10].status, 8, 14);
-		//	print_hexdump(&event_ring[11].status, 8, 15);
-		//	print_hexdump(&event_ring[12].status, 8, 16);
-		//	print_hexdump(&event_ring[13].status, 8, 17);
-		//	print_hexdump(&event_ring[14].status, 8, 18);
-		//	print_hexdump(&event_ring[15].status, 8, 19);
-		//}
-
+		{
+			print_hexdump(&event_ring[0].status, 8, 4);
+			print_hexdump(&event_ring[1].status, 8, 5);
+			print_hexdump(&event_ring[2].status, 8, 6);
+			print_hexdump(&event_ring[3].status, 8, 7);
+			print_hexdump(&event_ring[4].status, 8, 8);
+			print_hexdump(&event_ring[5].status, 8, 9);
+			print_hexdump(&event_ring[6].status, 8, 10);
+			print_hexdump(&event_ring[7].status, 8, 11);
+			print_hexdump(&event_ring[8].status, 8, 12);
+			print_hexdump(&event_ring[9].status, 8, 13);
+			print_hexdump(&event_ring[10].status, 8, 14);
+			print_hexdump(&event_ring[11].status, 8, 15);
+			print_hexdump(&event_ring[12].status, 8, 16);
+			print_hexdump(&event_ring[13].status, 8, 17);
+			print_hexdump(&event_ring[14].status, 8, 18);
+			print_hexdump(&event_ring[15].status, 8, 19);
+		}
 	}
 }
 
@@ -211,89 +210,190 @@ void xhci_alloc_scratchpad()
 // Real ports: 3,4,22
 void xhci_setup_device(uint8_t port)
 {
-	// Enable Slot Command
-	XHCI_TRB trb;
-	trb.address = 0;
-	trb.status = 0;
-	trb.control = TRB_SET_TYPE(ENABLE_SLOT);
-	XHCI_TRB event1 = xhci_do_command(trb);
-
-	//print_hexdump(&event1.status, 8, 21);
-
-	// Alloc memory for Device Context
-	XHCI_CONTEXT* dc = (XHCI_CONTEXT*)malloc_aligned(64, sizeof(XHCI_CONTEXT) * 32);
-	memset(dc, 0, sizeof(XHCI_CONTEXT) * 32);
-	uint8_t slot = TRB_GET_SLOT(event1.control);
-	dcbaa[slot] = (uintptr_t)dc;
-											
-	uint8_t speed = (op->PORTS[port].PORTSC >> 10) & 0b1111;
+	XHCI_CONTEXT* inputContext = (XHCI_CONTEXT*)malloc_aligned(64, sizeof(XHCI_CONTEXT) * 33);
+	memset(inputContext, 0, sizeof(XHCI_CONTEXT) * 33);
 
 	XHCI_TRB* transfer_ring = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16);
 	XHCI_TRB* transfer_ring_1 = (XHCI_TRB*)malloc_aligned(64, sizeof(XHCI_TRB) * 16);
 	memset(transfer_ring, 0, sizeof(XHCI_TRB) * 16);
 	memset(transfer_ring_1, 0, sizeof(XHCI_TRB) * 16);
 
-	// Construct Input Context
-	XHCI_CONTEXT* inputContext = (XHCI_CONTEXT*)malloc_aligned(64, sizeof(XHCI_CONTEXT) * 33);
-	memset(inputContext, 0, sizeof(XHCI_CONTEXT) * 33);
-	// Input Control Context
-	inputContext[0].data[1] = 0b011; 		 									
-	// Slot Context
-	inputContext[1].data[0] = SLOT_SET_CONTEXTENTRIES(1) | SLOT_SET_SPEED(speed) | SLOT_SET_ROUTE(0); 	
-	inputContext[1].data[1] = SLOT_SET_ROOTPORT(port) | SLOT_SET_MAXEXITLATENCY(0); // Max Exit Latency = 500 is a Parameter Error
-	// Endpoint Context
-	inputContext[2].data[0] = (0 << 16) | (0 << 10) | (0 << 8) | (0);				// Interval , MaxPStreams , Mult
-	inputContext[2].data[1] = (8 << 16) | (0 << 8) | (4 << 3) | (3 << 1);	// MaxPacketSize , MaxBurstSize , EPType , CErr // TODO: MaxPacketSize should be selected from device speed
-	inputContext[2].data[2] = ((uintptr_t)transfer_ring) | (1 << 0);		// TRDequeuePointer , DCS
-	inputContext[2].data[4] = (32 << 0);									// AverageTRBLength
+	USB_DEVICE_DESCRIPTOR descriptor;
+	uint8_t speed = (op->PORTS[port].PORTSC >> 10) & 0b1111;
+	uint8_t slot;
+
+	// Enable Slot Command
+	{
+		XHCI_TRB trb;
+		trb.address = 0;
+		trb.status = 0;
+		trb.control = TRB_SET_TYPE(ENABLE_SLOT);
+		XHCI_TRB event1 = xhci_do_command(trb);
+
+		slot = TRB_GET_SLOT(event1.control);
+
+		// Alloc memory for Device Context
+		XHCI_CONTEXT* dc = (XHCI_CONTEXT*)malloc_aligned(64, sizeof(XHCI_CONTEXT) * 32);
+		memset(dc, 0, sizeof(XHCI_CONTEXT) * 32);
+		dcbaa[slot] = (uintptr_t)dc;
+	}
+
 
 	// Address Device Command
-	XHCI_TRB trb2;
-	trb2.address = (uintptr_t)inputContext;
-	trb2.status = 0;
-	trb2.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(ADDRESS_DEVICE) | TRB_SET_BSR(0);
-	XHCI_TRB event2 = xhci_do_command(trb2);
+	{
+		// Input Control Context
+		inputContext[0].data[1] = 0b011;
+		// Slot Context
+		inputContext[1].data[0] = SLOT_SET_CONTEXTENTRIES(1) | SLOT_SET_SPEED(speed) | SLOT_SET_ROUTE(0);
+		inputContext[1].data[1] = SLOT_SET_ROOTPORT(port) | SLOT_SET_MAXEXITLATENCY(0); // Max Exit Latency = 500 is a Parameter Error
+		// Endpoint Context
+		inputContext[2].data[0] = (0 << 16) | (0 << 10) | (0 << 8) | (0);				// Interval , MaxPStreams , Mult
+		inputContext[2].data[1] = (8 << 16) | (0 << 8) | (4 << 3) | (3 << 1);	// MaxPacketSize , MaxBurstSize , EPType , CErr // TODO: MaxPacketSize should be selected from device speed
+		inputContext[2].data[2] = ((uintptr_t)transfer_ring) | (1 << 0);		// TRDequeuePointer , DCS
+		inputContext[2].data[4] = (32 << 0);									// AverageTRBLength
 
-	//print_hexdump(&event2.status, 8, 22);
+		XHCI_TRB trb;
+		trb.address = (uintptr_t)inputContext;
+		trb.status = 0;
+		trb.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(ADDRESS_DEVICE) | TRB_SET_BSR(0);
+		xhci_do_command(trb);
+	}
 
 	// Get Device Descriptor
-	USB_DEVICE_DESCRIPTOR descriptor;
 	xhci_get_descriptor(slot, transfer_ring, 1, 8, &descriptor);
 
-	// Update input context with correct MaxPacketSize
-	inputContext[0].data[1] = 0b010;
-	inputContext[2].data[1] = (descriptor.bMaxPacketSize0 << 16) | (0 << 8) | (4 << 3) | (3 << 1);
 	// Evaluate Context Command
-	XHCI_TRB trb3;
-	trb3.address = (uintptr_t)inputContext;
-	trb3.status = 0;
-	trb3.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(EVALUATE_CONTEXT) | TRB_SET_BSR(0);
-	XHCI_TRB event3 = xhci_do_command(trb3);
+	{
+		// Update input context with correct MaxPacketSize
+		inputContext[0].data[1] = 0b010;
+		inputContext[2].data[1] = (descriptor.bMaxPacketSize0 << 16) | (0 << 8) | (4 << 3) | (3 << 1);
 
-
-	inputContext[0].data[1] = 0b1001;
-								// Remember to set
-	inputContext[1].data[0] = SLOT_SET_CONTEXTENTRIES(3) | SLOT_SET_SPEED(speed) | SLOT_SET_ROUTE(0); 	
-	inputContext[1].data[1] = SLOT_SET_ROOTPORT(port);
-
-	inputContext[2].data[0] = 0;
-	inputContext[2].data[1] = 0;
-	inputContext[2].data[2] = 0;
-	inputContext[2].data[4] = 0;
-	// Endpoint 1 IN
-	inputContext[4].data[0] = (0 << 16) | (0 << 10) | (0 << 8);				// Interval , MaxPStreams , Mult
-	inputContext[4].data[1] = (8 << 16) | (0 << 8) | (4 << 3) | (3 << 1);	// MaxPacketSize , MaxBurstSize , EPType , CErr
-	inputContext[4].data[2] = ((uintptr_t)transfer_ring_1) | (1 << 0);		// TRDequeuePointer , DCS
-	inputContext[4].data[4] = (32 << 0);									// AverageTRBLength
+		XHCI_TRB trb;
+		trb.address = (uintptr_t)inputContext;
+		trb.status = 0;
+		trb.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(EVALUATE_CONTEXT) | TRB_SET_BSR(0);
+		xhci_do_command(trb);
+	}
 
 	// Configure Endpoint Command
-	XHCI_TRB trb4;
-	trb4.address = (uintptr_t)inputContext;
-	trb4.status = 0;
-	trb4.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(CONFIGURE_ENDPOINT);
-	XHCI_TRB event4 = xhci_do_command(trb4);
+	{
+		inputContext[0].data[1] = 0b1001;
+									// Remember to set
+		inputContext[1].data[0] = SLOT_SET_CONTEXTENTRIES(3) | SLOT_SET_SPEED(speed) | SLOT_SET_ROUTE(0);
+		inputContext[1].data[1] = SLOT_SET_ROOTPORT(port);
+
+		inputContext[2].data[0] = 0;
+		inputContext[2].data[1] = 0;
+		inputContext[2].data[2] = 0;
+		inputContext[2].data[4] = 0;
+		// Endpoint 1 IN
+		inputContext[4].data[0] = (16 << 16) | (0 << 10) | (0 << 8);			// Interval , MaxPStreams , Mult
+		inputContext[4].data[1] = (8 << 16) | (0 << 8) | (7 << 3) | (3 << 1);	// MaxPacketSize , MaxBurstSize , EPType , CErr
+		inputContext[4].data[2] = ((uintptr_t)transfer_ring_1) | (1 << 0);		// TRDequeuePointer , DCS
+		inputContext[4].data[4] = (32 << 0);									// AverageTRBLength
+
+		XHCI_TRB trb;
+		trb.address = (uintptr_t)inputContext;
+		trb.status = 0;
+		trb.control = TRB_SET_SLOT(slot) | TRB_SET_TYPE(CONFIGURE_ENDPOINT);
+		xhci_do_command(trb);
+	}
 
 	xhci_set_configuration(slot, transfer_ring);
+
+	// Set_Protocol: Boot
+	{
+		XHCI_TRB setup;
+		setup.address = TRB_SET_wLength(0) | TRB_SET_wIndex(0) | TRB_SET_wValue(0) | TRB_SET_bRequest(0x0B) | TRB_SET_bmRequestType(0x21);
+		setup.status = TRB_SET_INT_TARGET(0) | TRB_SET_TRANSFER_LENGTH(8);
+		setup.control = TRB_SET_TT(NO_DATA) | TRB_SET_TYPE(SETUP_STAGE) | TRB_SET_IDT(1) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
+		xhci_queue_transfer(setup, transfer_ring, &iTransferEnqueue, &bTransferCycle);
+
+		XHCI_TRB status;
+		status.address = 0;
+		status.status = TRB_SET_INT_TARGET(0);
+		status.control = TRB_SET_DIR(1) | TRB_SET_TYPE(STATUS_STAGE) | TRB_SET_IOC(1) | TRB_SET_CYCLE(1);
+		xhci_queue_transfer(status, transfer_ring, &iTransferEnqueue, &bTransferCycle);
+
+		doorbell[slot] = 1;
+
+		xhci_dequeue_event(TRANSFER_EVENT);
+	}
+
+	//XHCI_CONTEXT* dc1 = dcbaa[slot];
+	//uint32_t dc11 = dc1[3].data[0];
+	//print_hexdump(&dc11, 4, 12);
+
+	uint8_t cycle = 1;
+	uint8_t enqueue = 0;
+
+	// GetReport
+	while(1)
+	{
+		uint64_t buffer = 0;
+
+		XHCI_TRB setup;
+		setup.address = TRB_SET_wLength(8) | TRB_SET_wIndex(0) | TRB_SET_wValue(0x0100) | TRB_SET_bRequest(1) | TRB_SET_bmRequestType(0xA1);
+		setup.status = TRB_SET_INT_TARGET(0) | TRB_SET_TRANSFER_LENGTH(8);
+		setup.control = TRB_SET_TT(IN_DATA) | TRB_SET_TYPE(SETUP_STAGE) | TRB_SET_IDT(1) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
+		xhci_queue_transfer(setup, transfer_ring, &iTransferEnqueue, &bTransferCycle);
+
+		XHCI_TRB data;
+		data.address = (uintptr_t)buffer;
+		data.status = TRB_SET_INT_TARGET(0) | TRB_SET_TDSIZE(0) | TRB_SET_TRANSFER_LENGTH(8);
+		data.control = TRB_SET_DIR(1) | TRB_SET_TYPE(DATA_STAGE) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
+		xhci_queue_transfer(data, transfer_ring, &iTransferEnqueue, &bTransferCycle);
+
+		XHCI_TRB status;
+		status.address = 0;
+		status.status = TRB_SET_INT_TARGET(0);
+		status.control = TRB_SET_DIR(0) | TRB_SET_TYPE(STATUS_STAGE) | TRB_SET_IOC(1) | TRB_SET_CYCLE(1);
+		xhci_queue_transfer(status, transfer_ring, &iTransferEnqueue, &bTransferCycle);
+
+		doorbell[slot] = 1; // Ring Default Endpoint
+
+		xhci_dequeue_event(TRANSFER_EVENT);
+
+		print_hexdump(&buffer, 8, 22);
+	}
+
+
+	//uint64_t test = 0;
+
+	//XHCI_TRB data;
+	//data.address = (uintptr_t)&test;
+	//data.status = TRB_SET_INT_TARGET(0) | TRB_SET_TRANSFER_LENGTH(8);
+	//data.control = TRB_SET_TYPE(NORMAL) | TRB_SET_IDT(0) | TRB_SET_IOC(1) | (1 << 2) | TRB_SET_CYCLE(1);
+	//xhci_queue_transfer(data, transfer_ring_1, &enqueue, &cycle);
+
+	//doorbell[slot] = 3;
+
+	//for (int i = 0; i < 0xFFFFF; i++);
+	//print_hexdump(&test, 8, 2);
+
+
+	//xhci_dequeue_event(TRANSFER_EVENT);
+
+
+
+	//print_hexdump(&transfer_ring_1[0].status, 8, 4);
+	//print_hexdump(&transfer_ring_1[1].status, 8, 5);
+	//print_hexdump(&transfer_ring_1[2].status, 8, 6);
+	//print_hexdump(&transfer_ring_1[3].status, 8, 7);
+	//print_hexdump(&transfer_ring_1[4].status, 8, 8);
+	//print_hexdump(&transfer_ring_1[5].status, 8, 9);
+	//print_hexdump(&transfer_ring_1[6].status, 8, 10);
+	//print_hexdump(&transfer_ring_1[7].status, 8, 11);
+	//print_hexdump(&transfer_ring_1[8].status, 8, 12);
+	//print_hexdump(&transfer_ring_1[9].status, 8, 13);
+	//print_hexdump(&transfer_ring_1[10].status, 8, 14);
+	//print_hexdump(&transfer_ring_1[11].status, 8, 15);
+	//print_hexdump(&transfer_ring_1[12].status, 8, 16);
+	//print_hexdump(&transfer_ring_1[13].status, 8, 17);
+	//print_hexdump(&transfer_ring_1[14].status, 8, 18);
+	//print_hexdump(&transfer_ring_1[15].status, 8, 19);
+
+	//}
 
 	print_hexdump(&descriptor, 8, 23);
 
@@ -316,19 +416,19 @@ XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t type
 	setup.address = TRB_SET_wLength(length) | TRB_SET_wIndex(0) | TRB_SET_wValue(USB_DESC_TYPE(type) | USB_DESC_INDEX(0)) | TRB_SET_bRequest(6) | TRB_SET_bmRequestType(0x80);
 	setup.status = TRB_SET_INT_TARGET(0) | TRB_SET_TRANSFER_LENGTH(8);
 	setup.control = TRB_SET_TT(IN_DATA) | TRB_SET_TYPE(SETUP_STAGE) | TRB_SET_IDT(1) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
-	xhci_queue_transfer(setup, transfer_ring);
+	xhci_queue_transfer(setup, transfer_ring, &iTransferEnqueue, &bTransferCycle);
 
 	XHCI_TRB data;
 	data.address = (uintptr_t)buffer;
 	data.status = TRB_SET_INT_TARGET(0) | TRB_SET_TDSIZE(0) | TRB_SET_TRANSFER_LENGTH(length);
 	data.control = TRB_SET_DIR(1) | TRB_SET_TYPE(DATA_STAGE) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
-	xhci_queue_transfer(data, transfer_ring);
+	xhci_queue_transfer(data, transfer_ring, &iTransferEnqueue, &bTransferCycle);
 
 	XHCI_TRB status;
 	status.address = 0;
 	status.status = TRB_SET_INT_TARGET(0);
 	status.control = TRB_SET_DIR(0) | TRB_SET_TYPE(STATUS_STAGE) | TRB_SET_IOC(1) | TRB_SET_CYCLE(1);
-	xhci_queue_transfer(status, transfer_ring);
+	xhci_queue_transfer(status, transfer_ring, &iTransferEnqueue, &bTransferCycle);
 
 	doorbell[slot] = 1; // Ring Default Endpoint
 
@@ -337,23 +437,23 @@ XHCI_TRB xhci_get_descriptor(uint8_t slot, XHCI_TRB* transfer_ring, uint8_t type
 
 void xhci_set_configuration(uint8_t slot, XHCI_TRB* transfer_ring)
 {
-	for (int i = 0; i < 0xFFFFFF; i++);
+	//for (int i = 0; i < 0xFFFFFF; i++);
 
 	XHCI_TRB setup;
 	setup.address = TRB_SET_wLength(0) | TRB_SET_wIndex(0) | TRB_SET_wValue(0x0001) | TRB_SET_bRequest(9) | TRB_SET_bmRequestType(0x00);
 	setup.status = TRB_SET_INT_TARGET(0) | TRB_SET_TRANSFER_LENGTH(8);
 	setup.control = TRB_SET_TT(NO_DATA) | TRB_SET_TYPE(SETUP_STAGE) | TRB_SET_IDT(1) | TRB_SET_IOC(0) | TRB_SET_CYCLE(1);
-	xhci_queue_transfer(setup, transfer_ring);
+	xhci_queue_transfer(setup, transfer_ring, &iTransferEnqueue, &bTransferCycle);
 
 	XHCI_TRB status;
 	status.address = 0;
 	status.status = TRB_SET_INT_TARGET(0);
 	status.control = TRB_SET_DIR(1) | TRB_SET_TYPE(STATUS_STAGE) | TRB_SET_IOC(1) | TRB_SET_CYCLE(1);
-	xhci_queue_transfer(status, transfer_ring);
+	xhci_queue_transfer(status, transfer_ring, &iTransferEnqueue, &bTransferCycle);
 
 	doorbell[slot] = 1; // Ring Default Endpoint
 
-	//xhci_dequeue_event(TRANSFER_EVENT);
+	xhci_dequeue_event(TRANSFER_EVENT);
 }
 
 XHCI_TRB* xhci_queue_command(XHCI_TRB trb)
@@ -377,25 +477,25 @@ XHCI_TRB* xhci_queue_command(XHCI_TRB trb)
 	return &command_ring[iCmdEnqueue++];
 }
 
-XHCI_TRB* xhci_queue_transfer(XHCI_TRB trb, XHCI_TRB* transfer_ring)
+XHCI_TRB* xhci_queue_transfer(XHCI_TRB trb, XHCI_TRB* transfer_ring, uint8_t* enqueue, uint8_t* cycle)
 {
 	// If last TRB in Transfer Ring
-	if (iTransferEnqueue == 15)
+	if (*enqueue == 15)
 	{
 		// Set Link TRB that points to the top
 		transfer_ring[15].address = (uintptr_t)transfer_ring;
 		transfer_ring[15].status = (0 << 22);
-		transfer_ring[15].control = (6 << 10) | (1 << 5) | (1 << 1) | (bTransferCycle << 0);
+		transfer_ring[15].control = (6 << 10) | (1 << 5) | (1 << 1) | (*cycle << 0);
 
-		iTransferEnqueue = 0;				// Reset enqueue
-		bTransferCycle = !bTransferCycle;	// Flip Cycle
+		*enqueue = 0;				// Reset enqueue
+		*cycle = !(*cycle);	// Flip Cycle
 	}
 
-	transfer_ring[iTransferEnqueue].address = trb.address;
-	transfer_ring[iTransferEnqueue].status = trb.status;
-	transfer_ring[iTransferEnqueue].control = (trb.control & ~1) | (bTransferCycle << 0);
+	transfer_ring[*enqueue].address = trb.address;
+	transfer_ring[*enqueue].status = trb.status;
+	transfer_ring[*enqueue].control = (trb.control & ~1) | (*cycle << 0);
 
-	return &transfer_ring[iTransferEnqueue++];
+	return &transfer_ring[(*enqueue)++];
 }
 
 XHCI_TRB* xhci_dequeue_event(uint8_t trb_type)
